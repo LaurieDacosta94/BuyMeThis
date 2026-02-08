@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { DebugConsole } from './components/DebugConsole';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,7 +13,6 @@ root.render(
   <React.StrictMode>
     <ErrorBoundary>
       <App />
-      <DebugConsole />
     </ErrorBoundary>
   </React.StrictMode>
 );

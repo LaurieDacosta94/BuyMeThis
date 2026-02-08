@@ -13,22 +13,20 @@ import { Forum } from './components/Forum';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Hero } from './components/Hero';
 import { Auth } from './components/Auth';
-import { RequestItem, RequestStatus, LocationFilter, User, Notification, Category, ForumThread, ForumCategory, ForumReply } from './types';
-import { Filter, Search, Package, Gift, ArrowLeft, Map, List, Loader2 } from 'lucide-react';
-import { db, base64ToFile, uploadImage } from './services/db';
+import { RequestItem, RequestStatus, User, Notification, Category, ForumThread, ForumCategory, ForumReply } from './types';
+import { Search, Package, ArrowLeft, Map, List, Loader2, Database, AlertCircle } from 'lucide-react';
+import { db } from './services/db';
 import confetti from 'canvas-confetti';
 
 const App: React.FC = () => {
   // Auth State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  
-  // App State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  
+  // App Data
   const [users, setUsers] = useState<Record<string, User>>({});
   const [requests, setRequests] = useState<RequestItem[]>([]);
-  
-  // Real Database State for Forum & Notifications
   const [forumThreads, setForumThreads] = useState<ForumThread[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
@@ -59,29 +57,29 @@ const App: React.FC = () => {
     const userId = db.getSessionId();
     if (userId) {
       await fetchUserProfile(userId);
-      setIsAuthenticated(true);
-    } else {
-      setIsAuthenticated(false);
     }
+    // Always fetch public data regardless of auth status
+    await loadData();
     setAuthLoading(false);
   };
-
-  useEffect(() => {
-    if (isAuthenticated && currentUser) {
-      loadData();
-    }
-  }, [isAuthenticated, currentUser]);
 
   const loadData = async () => {
      setLoading(true);
      await Promise.all([
          fetchRequests(),
          fetchAllUsers(),
-         fetchForumThreads(),
-         fetchNotifications()
+         fetchForumThreads()
      ]);
      setLoading(false);
   };
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchNotifications();
+    } else {
+      setNotifications([]);
+    }
+  }, [currentUser]);
 
   // --- DATA FETCHING ---
 
@@ -91,6 +89,9 @@ const App: React.FC = () => {
       if (user) {
          setCurrentUser(user);
          setUsers(prev => ({ ...prev, [user.id]: user }));
+      } else {
+         // Session invalid
+         db.signOut();
       }
     } catch (e) { console.error(e); }
   };
@@ -134,6 +135,14 @@ const App: React.FC = () => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
+  const requireAuth = () => {
+      if (!currentUser) {
+          setShowAuthModal(true);
+          return false;
+      }
+      return true;
+  };
+
   const createNotification = async (userId: string, message: string, type: 'info' | 'success' | 'alert' = 'info', requestId?: string) => {
       await db.createNotification({
           id: `notif_${Date.now()}_${Math.random()}`,
@@ -148,8 +157,9 @@ const App: React.FC = () => {
 
   const handleSignOut = () => {
       db.signOut();
-      setIsAuthenticated(false);
       setCurrentUser(null);
+      showToast("Logged out successfully", "success");
+      handleNavigate('feed');
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
@@ -164,13 +174,10 @@ const App: React.FC = () => {
   };
 
   const handleCreateRequest = async (newRequest: RequestItem) => {
-    if (!currentUser) return;
+    if (!requireAuth()) return;
     setLoading(true);
     try {
-      // Image is already base64 in enrichedData.imageUrl for local DB/Neon storage
-      // In a real production app, we would upload to a bucket here.
       await db.createRequest(newRequest);
-      
       handleNavigate('feed');
       fetchRequests();
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -179,13 +186,12 @@ const App: React.FC = () => {
   };
 
   const handleCommit = async (requestId: string) => {
+    if (!requireAuth()) return;
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
     try {
       await db.updateRequest(requestId, { status: RequestStatus.PENDING, fulfillerId: currentUser.id });
-      
       if (req) createNotification(req.requesterId, `${currentUser.displayName} committed to buy your "${req.title}"!`, 'success', req.id);
-      
       setActiveRequest(prev => prev ? { ...prev, status: RequestStatus.PENDING, fulfillerId: currentUser.id } : null);
       fetchRequests();
       confetti({ particleCount: 50, spread: 60, colors: ['#6366f1', '#a855f7'] });
@@ -194,6 +200,7 @@ const App: React.FC = () => {
   };
 
   const handleConfirmPurchase = async (requestId: string, orderId: string, receiptImage?: string, giftMessage?: string, verificationStatus?: 'verified' | 'warning') => {
+    if (!requireAuth()) return;
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
     try {
@@ -204,9 +211,7 @@ const App: React.FC = () => {
             giftMessage: giftMessage,
             receiptVerificationStatus: verificationStatus
         });
-
         if (req) createNotification(req.requesterId, `${currentUser.displayName} purchased your item! Order ID: ${orderId}`, 'success', req.id);
-
         setIsFulfillmentModalOpen(false);
         setActiveRequest(null);
         fetchRequests();
@@ -216,13 +221,12 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTracking = async (requestId: string, trackingNumber: string) => {
+    if (!requireAuth()) return;
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
     try {
         await db.updateRequest(requestId, { trackingNumber });
-        
         if (req) createNotification(req.requesterId, `Tracking updated for "${req.title}": ${trackingNumber}`, 'info', req.id);
-
         setIsFulfillmentModalOpen(false);
         setActiveRequest(null);
         fetchRequests();
@@ -231,19 +235,17 @@ const App: React.FC = () => {
   };
   
   const handleMarkReceived = async (request: RequestItem) => {
+    if (!requireAuth()) return;
     setThankYouModalRequest(request);
   };
   
   const submitThankYou = async (message: string, forumPostData?: { title: string, content: string }) => {
     if (!thankYouModalRequest || !currentUser) return;
-    
     try {
       await db.updateRequest(thankYouModalRequest.id, { status: RequestStatus.RECEIVED, thankYouMessage: message });
-      
       if (thankYouModalRequest.fulfillerId) {
           createNotification(thankYouModalRequest.fulfillerId, `${currentUser.displayName} received the item and says: "${message}"`, 'success', thankYouModalRequest.id);
       }
-
       if (forumPostData) {
           await db.createThread({
               id: `th_${Date.now()}`,
@@ -261,7 +263,6 @@ const App: React.FC = () => {
       } else {
           showToast('Item marked received!');
       }
-
       setThankYouModalRequest(null);
       fetchRequests();
       confetti({ particleCount: 200, spread: 120, origin: { y: 0.6 } });
@@ -269,26 +270,24 @@ const App: React.FC = () => {
   };
 
   const handleAddComment = async (requestId: string, text: string) => {
+      if (!requireAuth()) return;
       if (!currentUser) return;
       const targetRequest = requests.find(r => r.id === requestId);
       if (!targetRequest) return;
-
       const newComment = { id: `c_${Date.now()}`, userId: currentUser.id, text, createdAt: new Date().toISOString() };
       const updatedComments = [...targetRequest.comments, newComment];
-
       try {
         await db.updateRequest(requestId, { comments: updatedComments });
-        
         if (targetRequest.requesterId !== currentUser.id) {
             createNotification(targetRequest.requesterId, `${currentUser.displayName} commented on "${targetRequest.title}"`, 'info', requestId);
         }
-        
         fetchRequests();
       } catch (err) { showToast('Failed to post comment', 'error'); }
   };
 
   // --- FORUM HANDLERS ---
   const handleAddForumThread = async (thread: ForumThread) => {
+      if (!requireAuth()) return;
       try {
           await db.createThread(thread);
           fetchForumThreads();
@@ -297,6 +296,7 @@ const App: React.FC = () => {
   };
 
   const handleAddForumReply = async (reply: ForumReply) => {
+      if (!requireAuth()) return;
       try {
           await db.createReply(reply);
           fetchForumThreads();
@@ -312,69 +312,97 @@ const App: React.FC = () => {
   // --- RENDERING ---
 
   const handleOpenFulfillment = (request: RequestItem) => {
+    if (!requireAuth()) return;
     setActiveRequest(request);
     setIsFulfillmentModalOpen(true);
   };
+  
   const handleNavigate = (view: string) => {
+    // If trying to access create/profile without auth, block it
+    if ((view === 'create' || view === 'profile') && !currentUser) {
+        setShowAuthModal(true);
+        return;
+    }
     setCurrentView(view);
     setViewingProfileId(view === 'profile' && currentUser ? currentUser.id : null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  
   const handleViewProfile = (userId: string) => {
     setViewingProfileId(userId);
     setCurrentView('profile');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  if (authLoading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="h-12 w-12 text-indigo-500 animate-spin" /></div>;
-  if (!isAuthenticated || !currentUser) return <Auth onLoginSuccess={checkSession} />;
+  if (authLoading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="h-12 w-12 text-indigo-600 animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-12">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans pb-12 selection:bg-indigo-100 selection:text-indigo-900">
+      
+      {!db.isNeon && (
+          <div className="bg-slate-900 text-white px-4 py-2 text-xs flex items-center justify-center gap-2">
+              <Database className="h-3 w-3 text-red-400" />
+              <span>Database not connected. Read-only demo mode.</span>
+              <button onClick={() => setShowAuthModal(true)} className="underline hover:text-indigo-300">Connect now</button>
+          </div>
+      )}
+
       <Navbar 
         currentView={currentView}
         onNavigate={handleNavigate}
         user={currentUser}
         allUsers={Object.values(users)} 
-        onSwitchUser={handleSignOut}
+        onSwitchUser={(id) => { console.log(id); }}
+        onLogout={handleSignOut}
+        onLogin={() => setShowAuthModal(true)}
         notifications={notifications}
         onMarkNotificationsRead={handleMarkNotificationsRead}
       />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
         {currentView === 'feed' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Hero />
             
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-              <div className="relative w-full sm:w-96">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 sticky top-20 z-30">
+              <div className="relative w-full md:w-96">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
                 <input 
                   type="text" 
                   placeholder="Search requests..." 
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm bg-slate-50 focus:bg-white transition-all outline-none"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
 
-              <div className="flex gap-2">
-                 <div className="bg-white p-1 rounded-lg border border-slate-200 flex shadow-sm">
-                    <button onClick={() => setFeedMode('list')} className={`p-2 rounded-md ${feedMode === 'list' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}><List className="h-4 w-4" /></button>
-                    <button onClick={() => setFeedMode('map')} className={`p-2 rounded-md ${feedMode === 'map' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}><Map className="h-4 w-4" /></button>
+              <div className="flex gap-3 w-full md:w-auto">
+                 <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
+                    <button onClick={() => setFeedMode('list')} className={`p-2.5 rounded-lg transition-all ${feedMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><List className="h-5 w-5" /></button>
+                    <button onClick={() => setFeedMode('map')} className={`p-2.5 rounded-lg transition-all ${feedMode === 'map' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Map className="h-5 w-5" /></button>
                  </div>
-                 <select className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as Category | 'All')}>
-                   <option value="All">All Categories</option>
-                   {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                 </select>
+                 <div className="relative flex-1 md:flex-none">
+                    <select 
+                        className="w-full md:w-48 appearance-none px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none cursor-pointer" 
+                        value={categoryFilter} 
+                        onChange={(e) => setCategoryFilter(e.target.value as Category | 'All')}
+                    >
+                        <option value="All">All Categories</option>
+                        {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+                 </div>
               </div>
             </div>
 
-            <RecommendedRequests currentUser={currentUser} requests={requests} onSelectRequest={(r) => { setActiveRequest(r); setIsFulfillmentModalOpen(true); }} />
+            {currentUser && <RecommendedRequests currentUser={currentUser} requests={requests} onSelectRequest={handleOpenFulfillment} />}
 
             {feedMode === 'map' ? (
-              <div className="mb-8"><RequestMap currentUser={currentUser} requests={requests} onSelectRequest={(r) => { setActiveRequest(r); setIsFulfillmentModalOpen(true); }} categoryFilter={categoryFilter} searchTerm={searchTerm} /></div>
+              <div className="mb-12"><RequestMap currentUser={currentUser} requests={requests} onSelectRequest={handleOpenFulfillment} categoryFilter={categoryFilter} searchTerm={searchTerm} /></div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {requests
                   .filter(r => {
                     const matchesSearch = r.title.toLowerCase().includes(searchTerm.toLowerCase()) || r.reason.toLowerCase().includes(searchTerm.toLowerCase());
@@ -391,39 +419,74 @@ const App: React.FC = () => {
                       onMarkReceived={handleMarkReceived}
                       onAddComment={handleAddComment}
                       currentUser={currentUser}
+                      onRequireAuth={() => setShowAuthModal(true)}
                     />
                   ))}
-                  {requests.length === 0 && !loading && <div className="col-span-full text-center py-12 text-slate-400"><Package className="h-12 w-12 mx-auto mb-3 opacity-20" /><p>No active requests found.</p></div>}
+                  {requests.length === 0 && !loading && (
+                      <div className="col-span-full py-24 text-center">
+                          <div className="bg-slate-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Package className="h-10 w-10 text-slate-300" />
+                          </div>
+                          <h3 className="text-xl font-bold text-slate-700 mb-2">No requests found</h3>
+                          <p className="text-slate-500">Try adjusting your filters or be the first to ask for help.</p>
+                      </div>
+                  )}
               </div>
             )}
           </div>
         )}
 
-        {currentView === 'create' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><button onClick={() => setCurrentView('feed')} className="mb-4 text-sm text-slate-500 hover:text-indigo-600 flex items-center gap-1"><ArrowLeft className="h-4 w-4" /> Back to Feed</button><CreateRequest currentUser={currentUser} onSubmit={handleCreateRequest} onCancel={() => setCurrentView('feed')} /></div>}
+        {currentView === 'create' && currentUser && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><button onClick={() => setCurrentView('feed')} className="mb-6 text-sm font-medium text-slate-500 hover:text-indigo-600 flex items-center gap-2 transition-colors"><ArrowLeft className="h-4 w-4" /> Back to Feed</button><CreateRequest currentUser={currentUser} onSubmit={handleCreateRequest} onCancel={() => setCurrentView('feed')} /></div>}
 
         {currentView === 'profile' && viewingProfileId && (
            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <button onClick={() => setCurrentView('feed')} className="mb-4 text-sm text-slate-500 hover:text-indigo-600 flex items-center gap-1"><ArrowLeft className="h-4 w-4" /> Back to Feed</button>
-             <UserProfile user={users[viewingProfileId]} requests={requests} isCurrentUser={viewingProfileId === currentUser.id} onEditProfile={() => setIsEditProfileOpen(true)} />
-             <div className="flex border-b border-slate-200 mb-6">
-                <button onClick={() => setProfileTab('requests')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${profileTab === 'requests' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>Requests</button>
-                <button onClick={() => setProfileTab('commitments')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${profileTab === 'commitments' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>Commitments</button>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).map(req => (
-                    <RequestCard key={req.id} request={req} requester={users[req.requesterId]} onFulfill={handleOpenFulfillment} onViewProfile={handleViewProfile} onMarkReceived={handleMarkReceived} onAddComment={handleAddComment} currentUser={currentUser} />
-                ))}
+             <button onClick={() => setCurrentView('feed')} className="mb-6 text-sm font-medium text-slate-500 hover:text-indigo-600 flex items-center gap-2 transition-colors"><ArrowLeft className="h-4 w-4" /> Back to Feed</button>
+             <UserProfile user={users[viewingProfileId]} requests={requests} isCurrentUser={viewingProfileId === currentUser?.id} onEditProfile={() => setIsEditProfileOpen(true)} />
+             
+             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-8">
+                <div className="flex border-b border-slate-100">
+                    <button onClick={() => setProfileTab('requests')} className={`flex-1 py-4 text-sm font-bold text-center transition-colors relative ${profileTab === 'requests' ? 'text-indigo-600 bg-indigo-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        Requests
+                        {profileTab === 'requests' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600" />}
+                    </button>
+                    <button onClick={() => setProfileTab('commitments')} className={`flex-1 py-4 text-sm font-bold text-center transition-colors relative ${profileTab === 'commitments' ? 'text-indigo-600 bg-indigo-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        Commitments
+                        {profileTab === 'commitments' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600" />}
+                    </button>
+                </div>
+                <div className="p-6 bg-slate-50/50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).length > 0 ? (
+                            requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).map(req => (
+                                <RequestCard key={req.id} request={req} requester={users[req.requesterId]} onFulfill={handleOpenFulfillment} onViewProfile={handleViewProfile} onMarkReceived={handleMarkReceived} onAddComment={handleAddComment} currentUser={currentUser} onRequireAuth={() => setShowAuthModal(true)} />
+                            ))
+                        ) : (
+                            <div className="col-span-full py-12 text-center text-slate-400 italic">No items to display.</div>
+                        )}
+                    </div>
+                </div>
              </div>
            </div>
         )}
         
         {currentView === 'leaderboard' && <Leaderboard users={Object.values(users)} requests={requests} />}
-        {currentView === 'forum' && <Forum currentUser={currentUser} users={users} threads={forumThreads} onAddThread={handleAddForumThread} onAddReply={handleAddForumReply} />}
+        {currentView === 'forum' && <Forum currentUser={currentUser} users={users} threads={forumThreads} onAddThread={handleAddForumThread} onAddReply={handleAddForumReply} onRequireAuth={() => setShowAuthModal(true)} />}
       </div>
 
-      {activeRequest && <FulfillmentModal isOpen={isFulfillmentModalOpen} onClose={() => { setIsFulfillmentModalOpen(false); setActiveRequest(null); }} request={activeRequest} currentUser={currentUser} onCommit={handleCommit} onConfirmPurchase={handleConfirmPurchase} onUpdateTracking={handleUpdateTracking} />}
+      {activeRequest && currentUser && <FulfillmentModal isOpen={isFulfillmentModalOpen} onClose={() => { setIsFulfillmentModalOpen(false); setActiveRequest(null); }} request={activeRequest} currentUser={currentUser} onCommit={handleCommit} onConfirmPurchase={handleConfirmPurchase} onUpdateTracking={handleUpdateTracking} />}
       {thankYouModalRequest && <ThankYouModal isOpen={!!thankYouModalRequest} onClose={() => setThankYouModalRequest(null)} itemTitle={thankYouModalRequest.title} originalReason={thankYouModalRequest.reason} donorName={users[thankYouModalRequest.fulfillerId || '']?.displayName} onSubmit={submitThankYou} />}
-      <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} user={currentUser} onSave={handleUpdateUser} />
+      {currentUser && <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} user={currentUser} onSave={handleUpdateUser} />}
+      
+      {showAuthModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowAuthModal(false)} />
+              <div className="relative w-full max-w-md animate-in zoom-in-95 duration-200">
+                  <button onClick={() => setShowAuthModal(false)} className="absolute -top-12 right-0 text-white/80 hover:text-white">Close <span className="text-2xl ml-1">&times;</span></button>
+                  <Auth onLoginSuccess={() => { setShowAuthModal(false); checkSession(); }} />
+              </div>
+          </div>
+      )}
+
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
