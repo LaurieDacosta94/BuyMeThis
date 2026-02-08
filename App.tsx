@@ -4,6 +4,7 @@ import { RequestCard } from './components/RequestCard';
 import { UserProfile } from './components/UserProfile';
 import { CreateRequest } from './components/CreateRequest';
 import { FulfillmentModal } from './components/FulfillmentModal';
+import { RequestDetailsModal } from './components/RequestDetailsModal';
 import { ThankYouModal } from './components/ThankYouModal';
 import { EditProfileModal } from './components/EditProfileModal';
 import { RequestMap } from './components/RequestMap';
@@ -37,6 +38,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   
   const [activeRequest, setActiveRequest] = useState<RequestItem | null>(null);
+  const [detailsRequest, setDetailsRequest] = useState<RequestItem | null>(null);
   const [isFulfillmentModalOpen, setIsFulfillmentModalOpen] = useState(false);
   const [thankYouModalRequest, setThankYouModalRequest] = useState<RequestItem | null>(null);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -189,14 +191,26 @@ const App: React.FC = () => {
     if (!requireAuth()) return;
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
-    try {
-      await db.updateRequest(requestId, { status: RequestStatus.PENDING, fulfillerId: currentUser.id });
-      if (req) createNotification(req.requesterId, `${currentUser.displayName} committed to buy your "${req.title}"!`, 'success', req.id);
-      setActiveRequest(prev => prev ? { ...prev, status: RequestStatus.PENDING, fulfillerId: currentUser.id } : null);
-      fetchRequests();
-      confetti({ particleCount: 50, spread: 60, colors: ['#6366f1', '#a855f7'] });
-      showToast('You committed to this request! Don\'t forget to buy it.');
-    } catch (err) { showToast('Failed to update request', 'error'); }
+    if (!req) return;
+
+    // Check if already a candidate
+    const candidates = req.candidates || [];
+    if (!candidates.includes(currentUser.id)) {
+        const newCandidates = [...candidates, currentUser.id];
+        try {
+            await db.updateRequest(requestId, { candidates: newCandidates, status: RequestStatus.PENDING });
+            createNotification(req.requesterId, `${currentUser.displayName} offered to help with "${req.title}"!`, 'success', req.id);
+            showToast('You offered to help! The requester has been notified.');
+            fetchRequests();
+            // Update local state if modal is open
+            if (activeRequest && activeRequest.id === requestId) {
+                 setActiveRequest({...activeRequest, candidates: newCandidates, status: RequestStatus.PENDING});
+            }
+        } catch(e) { showToast('Failed to update request', 'error'); }
+    } else {
+        // Already a candidate
+        showToast('You have already offered to help with this request.');
+    }
   };
 
   const handleConfirmPurchase = async (requestId: string, orderId: string, receiptImage?: string, giftMessage?: string, verificationStatus?: 'verified' | 'warning') => {
@@ -206,6 +220,7 @@ const App: React.FC = () => {
     try {
         await db.updateRequest(requestId, {
             status: RequestStatus.FULFILLED, 
+            fulfillerId: currentUser.id, // Set the final fulfiller
             trackingNumber: orderId,
             proofOfPurchaseImage: receiptImage,
             giftMessage: giftMessage,
@@ -214,6 +229,7 @@ const App: React.FC = () => {
         if (req) createNotification(req.requesterId, `${currentUser.displayName} purchased your item! Order ID: ${orderId}`, 'success', req.id);
         setIsFulfillmentModalOpen(false);
         setActiveRequest(null);
+        setDetailsRequest(null);
         fetchRequests();
         confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
         showToast('Purchase confirmed!', 'award');
@@ -247,7 +263,7 @@ const App: React.FC = () => {
           createNotification(thankYouModalRequest.fulfillerId, `${currentUser.displayName} received the item and says: "${message}"`, 'success', thankYouModalRequest.id);
       }
       if (forumPostData) {
-          await db.createThread({
+          const newThread: ForumThread = {
               id: `th_${Date.now()}`,
               authorId: currentUser.id,
               title: forumPostData.title,
@@ -257,7 +273,8 @@ const App: React.FC = () => {
               replies: [],
               views: 0,
               likes: []
-          });
+          };
+          await db.createThread(newThread);
           fetchForumThreads();
           showToast('Shared as a success story on the forum!');
       } else {
@@ -315,6 +332,12 @@ const App: React.FC = () => {
     if (!requireAuth()) return;
     setActiveRequest(request);
     setIsFulfillmentModalOpen(true);
+    // Close details modal if open
+    setDetailsRequest(null);
+  };
+
+  const handleOpenDetails = (request: RequestItem) => {
+    setDetailsRequest(request);
   };
   
   const handleNavigate = (view: string) => {
@@ -397,10 +420,10 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {currentUser && <RecommendedRequests currentUser={currentUser} requests={requests} onSelectRequest={handleOpenFulfillment} />}
+            {currentUser && <RecommendedRequests currentUser={currentUser} requests={requests} onSelectRequest={handleOpenDetails} />}
 
             {feedMode === 'map' ? (
-              <div className="mb-12"><RequestMap currentUser={currentUser} requests={requests} onSelectRequest={handleOpenFulfillment} categoryFilter={categoryFilter} searchTerm={searchTerm} /></div>
+              <div className="mb-12"><RequestMap currentUser={currentUser} requests={requests} onSelectRequest={handleOpenDetails} categoryFilter={categoryFilter} searchTerm={searchTerm} /></div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {requests
@@ -420,6 +443,7 @@ const App: React.FC = () => {
                       onAddComment={handleAddComment}
                       currentUser={currentUser}
                       onRequireAuth={() => setShowAuthModal(true)}
+                      onOpenDetails={handleOpenDetails}
                     />
                   ))}
                   {requests.length === 0 && !loading && (
@@ -458,7 +482,7 @@ const App: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).length > 0 ? (
                             requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).map(req => (
-                                <RequestCard key={req.id} request={req} requester={users[req.requesterId]} onFulfill={handleOpenFulfillment} onViewProfile={handleViewProfile} onMarkReceived={handleMarkReceived} onAddComment={handleAddComment} currentUser={currentUser} onRequireAuth={() => setShowAuthModal(true)} />
+                                <RequestCard key={req.id} request={req} requester={users[req.requesterId]} onFulfill={handleOpenFulfillment} onViewProfile={handleViewProfile} onMarkReceived={handleMarkReceived} onAddComment={handleAddComment} currentUser={currentUser} onRequireAuth={() => setShowAuthModal(true)} onOpenDetails={handleOpenDetails} />
                             ))
                         ) : (
                             <div className="col-span-full py-12 text-center text-slate-400 italic">No items to display.</div>
@@ -474,6 +498,7 @@ const App: React.FC = () => {
       </div>
 
       {activeRequest && currentUser && <FulfillmentModal isOpen={isFulfillmentModalOpen} onClose={() => { setIsFulfillmentModalOpen(false); setActiveRequest(null); }} request={activeRequest} currentUser={currentUser} onCommit={handleCommit} onConfirmPurchase={handleConfirmPurchase} onUpdateTracking={handleUpdateTracking} />}
+      {detailsRequest && <RequestDetailsModal isOpen={!!detailsRequest} onClose={() => setDetailsRequest(null)} request={detailsRequest} requester={users[detailsRequest.requesterId]} onFulfill={() => handleOpenFulfillment(detailsRequest)} currentUser={currentUser} candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} />}
       {thankYouModalRequest && <ThankYouModal isOpen={!!thankYouModalRequest} onClose={() => setThankYouModalRequest(null)} itemTitle={thankYouModalRequest.title} originalReason={thankYouModalRequest.reason} donorName={users[thankYouModalRequest.fulfillerId || '']?.displayName} onSubmit={submitThankYou} />}
       {currentUser && <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} user={currentUser} onSave={handleUpdateUser} />}
       

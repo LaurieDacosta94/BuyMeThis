@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User } from '../types';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
-import { MapPin, Clock, ArrowRight, PackageCheck, Truck, Quote, FileCheck, Navigation, MessageCircle, Send, AlertTriangle, Heart, Volume2, Loader2, StopCircle, Mic, ShieldCheck } from 'lucide-react';
+import { MapPin, Clock, ArrowRight, PackageCheck, Truck, Quote, FileCheck, Navigation, MessageCircle, Send, AlertTriangle, Heart, Volume2, Loader2, StopCircle, Mic, ShieldCheck, Users } from 'lucide-react';
 import { Button } from './Button';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { playPcmAudio } from '../utils/audio';
@@ -15,10 +15,11 @@ interface RequestCardProps {
   onAddComment?: (requestId: string, text: string) => void;
   currentUser: User | null;
   onRequireAuth: () => void;
+  onOpenDetails?: (request: RequestItem) => void;
 }
 
 export const RequestCard: React.FC<RequestCardProps> = ({ 
-  request, requester, onFulfill, onMarkReceived, onViewProfile, onAddComment, currentUser, onRequireAuth
+  request, requester, onFulfill, onMarkReceived, onViewProfile, onAddComment, currentUser, onRequireAuth, onOpenDetails
 }) => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -38,6 +39,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
 
   const isMyRequest = currentUser && request.requesterId === currentUser.id;
   const isMyCommitment = currentUser && request.fulfillerId === currentUser.id;
+  const amICandidate = currentUser && request.candidates?.includes(currentUser.id);
   
   const isReceived = request.status === RequestStatus.RECEIVED;
   const isFulfilled = request.status === RequestStatus.FULFILLED;
@@ -45,7 +47,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   
   const isVerifiedPurchase = request.receiptVerificationStatus === 'verified';
 
-  // Calculate generic time ago
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -54,7 +55,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  // Calculate distance if both user and request have coords
   const distanceInfo = React.useMemo(() => {
     if (currentUser?.coordinates && request.coordinates) {
       const dist = calculateDistance(
@@ -97,7 +97,8 @@ export const RequestCard: React.FC<RequestCardProps> = ({
     }
   };
 
-  const handlePlayAudio = async () => {
+  const handlePlayAudio = async (e: React.MouseEvent) => {
+      e.stopPropagation();
       if (isPlayingAudio && audioSource) {
           audioSource.stop();
           setIsPlayingAudio(false);
@@ -179,7 +180,8 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       }
   };
 
-  const handleActionClick = () => {
+  const handleActionClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
       if (!currentUser) {
           onRequireAuth();
           return;
@@ -187,8 +189,19 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       onFulfill(request);
   };
 
+  const handleCardClick = (e: React.MouseEvent) => {
+      // Don't open if clicking on buttons or inputs
+      if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input') || (e.target as HTMLElement).closest('textarea')) {
+          return;
+      }
+      if (onOpenDetails) onOpenDetails(request);
+  };
+
   return (
-    <div className={`group bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col hover:-translate-y-1 h-full`}>
+    <div 
+        onClick={handleCardClick}
+        className={`group bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col hover:-translate-y-1 h-full cursor-pointer`}
+    >
       <div className="relative h-56 overflow-hidden bg-slate-100">
         <img 
           src={request.enrichedData?.imageUrl || `https://picsum.photos/seed/${request.id}/400/200`} 
@@ -236,7 +249,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         <div className="flex items-start justify-between mb-4">
           <div 
             className="flex items-center gap-3 group/user cursor-pointer"
-            onClick={() => onViewProfile && onViewProfile(requester.id)}
+            onClick={(e) => { e.stopPropagation(); onViewProfile && onViewProfile(requester.id); }}
             title="View Profile"
           >
             <img src={requester.avatarUrl} alt={requester.displayName} className="h-10 w-10 rounded-full bg-slate-200 object-cover ring-2 ring-transparent group-hover/user:ring-indigo-100 transition-all" />
@@ -255,6 +268,16 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         <p className="text-slate-600 text-sm leading-relaxed mb-6 flex-1 line-clamp-3">
           {request.reason}
         </p>
+
+        {/* Candidate Count */}
+        {request.candidates && request.candidates.length > 0 && !isFulfilled && !isReceived && (
+            <div className="mb-4 flex items-center gap-2 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100">
+                <Users className="h-4 w-4 text-indigo-500" />
+                <span className="text-xs font-bold text-indigo-700">
+                    {request.candidates.length} {request.candidates.length === 1 ? 'person' : 'people'} offered to help
+                </span>
+            </div>
+        )}
         
         {/* Listen Button */}
         <div className="mb-6">
@@ -272,7 +295,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         {(isFulfilled || isReceived) && request.proofOfPurchaseImage && isMyRequest && (
           <div className="mb-4">
              <button 
-               onClick={() => setShowReceipt(!showReceipt)}
+               onClick={(e) => { e.stopPropagation(); setShowReceipt(!showReceipt); }}
                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 mb-2 bg-indigo-50 px-3 py-2 rounded-lg"
              >
                <FileCheck className="h-3.5 w-3.5" />
@@ -280,7 +303,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
              </button>
              
              {showReceipt && (
-               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                  <img 
                    src={request.proofOfPurchaseImage} 
                    alt="Proof of Purchase" 
@@ -320,7 +343,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
           {/* Comments Section Toggle */}
           <div className="mb-4">
              <button 
-               onClick={() => setShowComments(!showComments)}
+               onClick={(e) => { e.stopPropagation(); setShowComments(!showComments); }}
                className={`w-full text-xs font-bold flex items-center justify-center gap-2 py-2 rounded-lg transition-colors ${request.comments.length > 0 || showComments ? 'text-slate-700 bg-slate-50 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
              >
                <MessageCircle className="h-4 w-4" />
@@ -329,7 +352,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
           </div>
 
           {showComments && (
-            <div className="bg-slate-50/80 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 border border-slate-100">
+            <div className="bg-slate-50/80 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 border border-slate-100" onClick={e => e.stopPropagation()}>
               {request.comments.length > 0 ? (
                 <div className="space-y-4 mb-4 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                   {request.comments.map(comment => (
@@ -404,7 +427,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                  <Button 
                    size="sm" 
                    variant="primary" 
-                   onClick={() => onMarkReceived && onMarkReceived(request)}
+                   onClick={(e) => { e.stopPropagation(); onMarkReceived && onMarkReceived(request); }}
                    className="w-full bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 rounded-xl py-2.5"
                  >
                    <PackageCheck className="mr-2 h-4 w-4" /> Mark Received
@@ -449,9 +472,19 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                  <div className="w-full bg-slate-50 text-slate-400 font-bold py-2.5 rounded-xl text-center text-sm border border-slate-200">
                     Already fulfilled
                  </div>
-               ) : isPending ? (
-                 <div className="w-full bg-amber-50 text-amber-600 font-bold py-2.5 rounded-xl text-center text-sm border border-amber-200">
-                    Being fulfilled...
+               ) : amICandidate ? (
+                 <div className="w-full flex gap-2">
+                     <div className="flex-1 bg-indigo-50 text-indigo-700 font-bold py-2.5 rounded-xl text-center text-sm border border-indigo-200 flex items-center justify-center gap-2">
+                         <CheckCircle className="h-4 w-4" /> You Offered Help
+                     </div>
+                     <Button 
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleActionClick}
+                        className="rounded-xl px-4"
+                     >
+                        Confirm
+                     </Button>
                  </div>
                ) : (
                  <Button 
@@ -460,7 +493,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                    onClick={handleActionClick}
                    className="w-full rounded-xl py-2.5 font-bold shadow-lg shadow-indigo-600/20"
                  >
-                   Fulfill Request <ArrowRight className="ml-2 h-4 w-4" />
+                   I Can Help <ArrowRight className="ml-2 h-4 w-4" />
                  </Button>
                )
              )}
@@ -470,3 +503,8 @@ export const RequestCard: React.FC<RequestCardProps> = ({
     </div>
   );
 };
+
+// Simple internal icon for this file
+function CheckCircle({ className }: { className?: string }) {
+    return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+}

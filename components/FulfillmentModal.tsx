@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RequestItem, RequestStatus, User } from '../types';
 import { Button } from './Button';
-import { Lock, Copy, CheckCircle, ExternalLink, X, Truck, Image as ImageIcon, Search, Sparkles, MapPin, Globe, ShieldAlert, Heart, Smile, Zap, Loader2 } from 'lucide-react';
+import { Lock, Copy, CheckCircle, ExternalLink, X, Truck, Image as ImageIcon, Search, Sparkles, MapPin, Globe, ShieldAlert, Heart, Smile, Zap, Loader2, HandHelping } from 'lucide-react';
 import { findBuyingOptions, findLocalStores, BuyingOption, generateGiftMessage, getSafetyTips, verifyReceipt } from '../services/geminiService';
 
 interface FulfillmentModalProps {
@@ -35,17 +35,19 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
   const [isVerifyingReceipt, setIsVerifyingReceipt] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{ status: 'verified' | 'warning', reasoning: string } | null>(null);
 
+  // Candidates logic
+  const isCandidate = request.candidates?.includes(currentUser.id);
+  const isFulfiller = request.fulfillerId === currentUser.id;
+  const isFulfilled = request.status === RequestStatus.FULFILLED;
+
   useEffect(() => {
-    if (isOpen && request.status === RequestStatus.PENDING) {
+    if (isOpen) {
         // Load safety tips when entering fulfillment mode
         getSafetyTips(request.title, request.location, request.shippingAddress).then(setSafetyTips);
     }
-  }, [isOpen, request.status, request.title, request.location, request.shippingAddress]);
+  }, [isOpen, request.title, request.location, request.shippingAddress]);
 
   if (!isOpen) return null;
-
-  const isPending = request.status === RequestStatus.PENDING;
-  const isFulfilled = request.status === RequestStatus.FULFILLED;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -107,12 +109,16 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
   const handleGenerateMessage = async (tone: 'warm' | 'funny' | 'inspiring') => {
       setIsGeneratingMessage(true);
       try {
-          // Note: In a real app we'd fetch the requester's name properly
           const msg = await generateGiftMessage(request.title, "Friend", tone);
           setGiftMessage(msg);
       } finally {
           setIsGeneratingMessage(false);
       }
+  };
+
+  const handleOfferHelp = () => {
+      onCommit(request.id);
+      // Don't close immediately, let them see they are added
   };
 
   return (
@@ -126,16 +132,16 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
 
         <div className="bg-indigo-600 p-6 text-white shrink-0">
           <h3 className="text-xl font-bold">
-            {isFulfilled ? 'Update Tracking' : 'Fulfill this Request'}
+            {isFulfilled ? 'Update Tracking' : (isCandidate || isFulfiller) ? 'Complete Fulfillment' : 'Offer to Help'}
           </h3>
           <p className="text-indigo-100 text-sm mt-1">
-            {isFulfilled ? 'Help the requester track their gift.' : 'Make a difference for someone today.'}
+            {isFulfilled ? 'Help the requester track their gift.' : 'You can offer to buy this item or commit to it now.'}
           </p>
         </div>
 
         <div className="p-6 overflow-y-auto">
           {/* Safety Tips Alert */}
-          {safetyTips.length > 0 && isPending && (
+          {safetyTips.length > 0 && (
              <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm animate-in slide-in-from-top-2">
                 <div className="flex items-center gap-2 font-semibold mb-1 text-amber-700">
                     <ShieldAlert className="h-4 w-4" /> AI Safety Advisor
@@ -158,22 +164,28 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
             </div>
           </div>
 
-          {!isPending && !isFulfilled ? (
+          {!isCandidate && !isFulfiller ? (
             <div className="space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-slate-700 text-sm">
+               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-slate-700 text-sm">
                 <p className="font-medium mb-1 flex items-center gap-2">
                   <Lock className="h-4 w-4" />
                   Address is Hidden
                 </p>
-                To see the shipping address and avoid duplicate purchases, you must commit to this request.
+                To see the shipping address, you must first offer to help. This notifies the requester.
               </div>
               
-              <Button onClick={() => onCommit(request.id)} className="w-full">
-                I'll Buy This
+              <Button onClick={handleOfferHelp} className="w-full font-bold shadow-lg shadow-indigo-500/20" size="lg">
+                <HandHelping className="mr-2 h-5 w-5" /> I Can Help with This
               </Button>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-in slide-in-from-bottom-4">
+               {!isFulfiller && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-800 text-sm font-medium flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4" /> You have offered to help!
+                  </div>
+               )}
+
               {/* Address Section */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Shipping Address</label>
@@ -327,7 +339,7 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Upload Receipt (Optional)</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Upload Receipt (Required for Verification)</label>
                       <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 border-dashed rounded-lg hover:bg-slate-50 transition-colors relative">
                         {receiptImage ? (
                           <div className="text-center relative w-full">
@@ -371,12 +383,15 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
 
                     <Button 
                       onClick={() => onConfirmPurchase(request.id, inputVal, receiptImage || undefined, giftMessage, verificationResult?.status)} 
-                      disabled={!inputVal || isVerifyingReceipt}
+                      disabled={!inputVal || isVerifyingReceipt || !verificationResult}
                       className="w-full"
                       variant="secondary"
                     >
                       Confirm Purchase <CheckCircle className="ml-2 h-4 w-4" />
                     </Button>
+                    {!verificationResult && receiptImage && !isVerifyingReceipt && (
+                        <p className="text-center text-xs text-slate-400">Waiting for AI Verification...</p>
+                    )}
                   </>
                 )}
               </div>

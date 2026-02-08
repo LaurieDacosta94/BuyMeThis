@@ -159,6 +159,7 @@ export const db = {
             coordinates: r.coordinates_lat ? { lat: r.coordinates_lat, lng: r.coordinates_lng } : undefined,
             shippingAddress: r.shipping_address,
             fulfillerId: r.fulfiller_id,
+            candidates: r.candidates || [],
             trackingNumber: r.tracking_number,
             proofOfPurchaseImage: r.proof_of_purchase_image,
             giftMessage: r.gift_message,
@@ -176,18 +177,19 @@ export const db = {
 
   async createRequest(req: RequestItem) {
       if (!sql) throw new Error("Database not configured");
+      // Note: we assume 'candidates' column exists now.
       await sql`
-          INSERT INTO requests (id, requester_id, title, reason, category, status, location, created_at, coordinates_lat, coordinates_lng, shipping_address, enriched_data)
-          VALUES (${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.status}, ${req.location}, ${req.createdAt}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}, ${req.shippingAddress}, ${JSON.stringify(req.enrichedData)})
+          INSERT INTO requests (id, requester_id, title, reason, category, status, location, created_at, coordinates_lat, coordinates_lng, shipping_address, enriched_data, candidates)
+          VALUES (${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.status}, ${req.location}, ${req.createdAt}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}, ${req.shippingAddress}, ${JSON.stringify(req.enrichedData)}, ${req.candidates})
       `;
   },
 
   async updateRequest(reqId: string, updates: Partial<RequestItem>) {
       if (!sql) throw new Error("Database not configured");
       
-      // We can use dynamic query construction but keeping it simple for stability
       if (updates.status) await sql`UPDATE requests SET status = ${updates.status} WHERE id = ${reqId}`;
       if (updates.fulfillerId) await sql`UPDATE requests SET fulfiller_id = ${updates.fulfillerId} WHERE id = ${reqId}`;
+      if (updates.candidates) await sql`UPDATE requests SET candidates = ${updates.candidates} WHERE id = ${reqId}`;
       if (updates.trackingNumber) await sql`UPDATE requests SET tracking_number = ${updates.trackingNumber} WHERE id = ${reqId}`;
       if (updates.comments) await sql`UPDATE requests SET comments = ${JSON.stringify(updates.comments)} WHERE id = ${reqId}`;
       if (updates.proofOfPurchaseImage) await sql`UPDATE requests SET proof_of_purchase_image = ${updates.proofOfPurchaseImage} WHERE id = ${reqId}`;
@@ -228,9 +230,10 @@ export const db = {
 
   async createThread(thread: ForumThread) {
        if (!sql) throw new Error("Database not configured");
+       // Fix: Using simple string for empty array literal or relying on driver to handle empty array
        await sql`
          INSERT INTO forum_threads (id, author_id, title, content, category, created_at, views, likes)
-         VALUES (${thread.id}, ${thread.authorId}, ${thread.title}, ${thread.content}, ${thread.category}, ${thread.createdAt}, 0, '[]')
+         VALUES (${thread.id}, ${thread.authorId}, ${thread.title}, ${thread.content}, ${thread.category}, ${thread.createdAt}, 0, ${[]})
        `;
   },
 

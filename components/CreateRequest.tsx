@@ -235,7 +235,8 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
         description: "User requested item",
         imageUrl: finalImage
       },
-      comments: []
+      comments: [],
+      candidates: []
     };
 
     onSubmit(newRequest);

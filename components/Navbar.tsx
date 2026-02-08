@@ -113,7 +113,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
 
                 {activeMenu === 'notifications' && (
-                    <div className="absolute right-0 mt-4 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 origin-top-right">
+                    <div className="absolute right-[-60px] md:right-0 mt-4 w-80 max-w-[90vw] bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 origin-top-right">
                     <div className="px-5 py-4 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center backdrop-blur-sm">
                         <span className="text-sm font-bold text-slate-900">Notifications</span>
                         {unreadCount > 0 && <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold">{unreadCount} New</span>}

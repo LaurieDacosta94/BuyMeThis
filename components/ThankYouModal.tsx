@@ -28,7 +28,8 @@ export const ThankYouModal: React.FC<ThankYouModalProps> = ({
       const generated = await generateThankYouMessage(itemTitle, donorName);
       setMessage(generated);
     } catch (e) {
-      // Error handling is internal to service currently
+      // Fallback
+      setMessage("Thank you so much! This really helps.");
     } finally {
       setIsGenerating(false);
     }
@@ -45,11 +46,19 @@ export const ThankYouModal: React.FC<ThankYouModalProps> = ({
              forumPostData = await draftSuccessStoryThread(itemTitle, donorName || 'Anonymous', originalReason, message);
           } catch (e) {
              console.error("Failed to draft forum post", e);
+             // Proceed without forum post rather than failing completely
           }
       }
       
-      onSubmit(message, forumPostData);
-      setIsSubmitting(false);
+      try {
+        await onSubmit(message, forumPostData);
+      } catch (e) {
+        console.error("Submit failed", e);
+        // Try to close at least
+      } finally {
+        setIsSubmitting(false);
+        onClose();
+      }
   };
 
   return (

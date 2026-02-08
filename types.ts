@@ -1,7 +1,7 @@
 
 export enum RequestStatus {
   OPEN = 'OPEN',
-  PENDING = 'PENDING', // Fulfiller committed
+  PENDING = 'PENDING', // Fulfiller committed (legacy/primary status)
   FULFILLED = 'FULFILLED', // Fulfiller confirmed purchase
   RECEIVED = 'RECEIVED' // Requester confirmed receipt
 }
@@ -86,7 +86,8 @@ export interface RequestItem {
   enrichedData?: ProductDetails;
 
   // Fulfillment Data
-  fulfillerId?: string;
+  candidates: string[]; // List of user IDs who offered to help
+  fulfillerId?: string; // The specific user who completed/is completing it
   trackingNumber?: string;
   proofOfPurchaseUrl?: string;
   proofOfPurchaseImage?: string; // Base64 image of receipt
