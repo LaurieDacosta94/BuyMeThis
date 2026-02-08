@@ -1,8 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-// User provided keys
-const supabaseUrl = 'https://rbrfdcxkoqktunqkjfai.supabase.co';
-const supabaseAnonKey = 'sb_publishable_j1LEX-UMFbF6GNN6wI9sgw_sH062Qk9';
+// Use environment variables defined in .env and loaded via vite.config.ts
+// We provide fallbacks to prevent the app from crashing if keys are missing.
+const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'placeholder-key';
+
+if (supabaseUrl === 'https://placeholder.supabase.co') {
+  console.warn("Supabase keys are missing or invalid. Please check your .env file.");
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
