@@ -585,8 +585,8 @@ const App: React.FC = () => {
                         value={categoryFilter} 
                         onChange={(e) => setCategoryFilter(e.target.value as Category | 'All')}
                     >
-                        <option value="All">FILTER: ALL</option>
-                        {Object.values(Category).map(c => <option key={c} value={c}>FILTER: {c.toUpperCase()}</option>)}
+                        <option value="All">All Categories</option>
+                        {Object.values(Category).map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}
                     </select>
                  </div>
               </div>

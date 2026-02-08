@@ -1,8 +1,8 @@
 
 import React, { useState, useRef } from 'react';
-import { RequestItem, RequestStatus, User, DeliveryPreference } from '../types';
+import { RequestItem, RequestStatus, User, DeliveryPreference, Fulfillment } from '../types';
 import { Button } from './Button';
-import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play } from 'lucide-react';
+import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play, ArrowLeft, Package, Clock, ShieldCheck, ShieldAlert, Heart } from 'lucide-react';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
 import { playPcmAudio } from '../utils/audio';
@@ -11,7 +11,7 @@ import { LinkPreview } from './LinkPreview';
 interface RequestDetailsModalProps {
   request: RequestItem;
   requester: User;
-  usersMap: Record<string, User>; // Added usersMap prop
+  usersMap: Record<string, User>; 
   isOpen: boolean;
   onClose: () => void;
   onFulfill: () => void;
@@ -33,6 +33,9 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
   const [isRecordingComment, setIsRecordingComment] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  
+  // Fulfillment Details View State
+  const [viewingFulfillmentUser, setViewingFulfillmentUser] = useState<User | null>(null);
 
   const isMyRequest = currentUser && request.requesterId === currentUser.id;
 
@@ -127,12 +130,114 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
   const stopRecording = () => { if (mediaRecorderRef.current && isRecordingComment) { mediaRecorderRef.current.stop(); setIsRecordingComment(false); } };
   const handleDelete = () => { if (confirm("Are you sure you want to delete this request?")) { onDelete && onDelete(request); onClose(); } };
 
+  const getFulfillmentDetails = (userId: string) => {
+      return request.fulfillments?.find(f => f.fulfillerId === userId);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
       
       <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
         
+        {/* Render Fulfillment Details View if selected */}
+        {viewingFulfillmentUser ? (
+            <div className="flex flex-col h-full bg-slate-50">
+                <div className="bg-white p-4 border-b border-slate-200 flex items-center gap-3 shadow-sm sticky top-0 z-10">
+                    <button onClick={() => setViewingFulfillmentUser(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <h2 className="font-bold text-lg text-slate-800">Fulfillment Status</h2>
+                </div>
+                
+                <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                    <div className="flex items-center gap-4 mb-6">
+                        <img src={viewingFulfillmentUser.avatarUrl} className="w-16 h-16 rounded-full border-2 border-white shadow-md" alt="" />
+                        <div>
+                            <div className="font-bold text-xl text-slate-900">{viewingFulfillmentUser.displayName}</div>
+                            <div className="text-sm text-slate-500">@{viewingFulfillmentUser.handle}</div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
+                         {(() => {
+                             const details = getFulfillmentDetails(viewingFulfillmentUser.id);
+                             if (!details) {
+                                 return (
+                                     <div className="text-center py-8">
+                                         <Clock className="w-10 h-10 text-blue-300 mx-auto mb-3" />
+                                         <h3 className="font-bold text-slate-700">Offer Pending</h3>
+                                         <p className="text-sm text-slate-500 mt-1">This user has offered to help but hasn't confirmed purchase yet.</p>
+                                     </div>
+                                 );
+                             }
+                             
+                             const isAuthorized = currentUser && (currentUser.id === request.requesterId || currentUser.id === viewingFulfillmentUser.id);
+
+                             return (
+                                 <>
+                                    <div className="flex items-center gap-3 p-4 bg-green-50 text-green-700 rounded-xl border border-green-100">
+                                        <CheckCircle className="w-6 h-6 flex-shrink-0" />
+                                        <div>
+                                            <div className="font-bold text-sm uppercase">Item Purchased</div>
+                                            <div className="text-xs opacity-80">{new Date(details.createdAt).toLocaleDateString()}</div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Tracking / Order ID</label>
+                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 font-mono text-sm text-slate-700 flex items-center justify-between">
+                                            {isAuthorized ? (
+                                                <span>{details.trackingNumber}</span>
+                                            ) : (
+                                                <span className="italic text-slate-400 flex items-center gap-2"><Lock className="w-3 h-3"/> Hidden (Private)</span>
+                                            )}
+                                            {isAuthorized && <Package className="w-4 h-4 text-slate-400" />}
+                                        </div>
+                                    </div>
+                                    
+                                    {details.proofOfPurchaseImage && (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Proof of Purchase</label>
+                                            <div className="bg-slate-100 rounded-xl overflow-hidden border border-slate-200 relative group">
+                                                {isAuthorized ? (
+                                                     <img src={details.proofOfPurchaseImage} alt="Receipt" className="w-full max-h-60 object-contain" />
+                                                ) : (
+                                                     <div className="h-32 flex items-center justify-center text-slate-400 text-sm italic bg-slate-50">
+                                                         <div className="flex flex-col items-center gap-2">
+                                                            <Lock className="w-6 h-6" />
+                                                            <span>Receipt is private</span>
+                                                         </div>
+                                                     </div>
+                                                )}
+                                                
+                                                {details.receiptVerificationStatus && isAuthorized && (
+                                                     <div className={`absolute bottom-2 right-2 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm ${details.receiptVerificationStatus === 'verified' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                         {details.receiptVerificationStatus === 'verified' ? <ShieldCheck className="w-3 h-3" /> : <ShieldAlert className="w-3 h-3" />}
+                                                         {details.receiptVerificationStatus === 'verified' ? 'Verified Match' : 'Manual Review'}
+                                                     </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {details.giftMessage && isAuthorized && (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Message from Donor</label>
+                                            <div className="bg-pink-50 p-4 rounded-xl border border-pink-100 text-pink-800 text-sm italic relative">
+                                                <Heart className="w-4 h-4 text-pink-300 absolute top-2 right-2" />
+                                                "{details.giftMessage}"
+                                            </div>
+                                        </div>
+                                    )}
+                                 </>
+                             );
+                         })()}
+                    </div>
+                </div>
+            </div>
+        ) : (
+        <>
         {/* Hero Header */}
         <div className="relative h-56 shrink-0">
              <div className="absolute inset-0 bg-slate-900/30 z-10"></div>
@@ -208,16 +313,21 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                             <Users className="h-4 w-4 text-blue-500" /> Active Offers ({candidates.length})
                         </h4>
                         <div className="flex flex-wrap gap-2">
-                            {candidates.map(c => (
+                            {candidates.map(c => {
+                                const details = getFulfillmentDetails(c.id);
+                                const isFulfilled = !!details;
+                                return (
                                 <div 
                                     key={c.id} 
-                                    className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-blue-100 shadow-sm cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all"
-                                    onClick={() => onViewProfile && onViewProfile(c.id)}
+                                    className={`flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border shadow-sm cursor-pointer hover:bg-blue-50 transition-all ${isFulfilled ? 'border-green-200 bg-green-50' : 'border-blue-100'}`}
+                                    onClick={() => setViewingFulfillmentUser(c)}
                                 >
                                     <img src={c.avatarUrl} className="w-5 h-5 rounded-full" alt="" />
-                                    <span className="text-xs font-bold text-slate-700">{c.displayName}</span>
+                                    <span className={`text-xs font-bold ${isFulfilled ? 'text-green-700' : 'text-slate-700'}`}>{c.displayName}</span>
+                                    {isFulfilled && <CheckCircle className="w-3 h-3 text-green-500" />}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -307,6 +417,8 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                 </Button>
              )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
