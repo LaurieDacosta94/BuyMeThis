@@ -9,8 +9,15 @@ interface AuthProps {
 
 // SQL Script for setting up Neon
 const NEON_SETUP_SQL = `
+-- RESET DATABASE (Drop all existing tables)
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS forum_replies CASCADE;
+DROP TABLE IF EXISTS forum_threads CASCADE;
+DROP TABLE IF EXISTS requests CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
+
 -- 1. Create Profiles Table
-create table if not exists profiles (
+create table profiles (
   id text primary key,
   display_name text,
   handle text,
@@ -27,7 +34,7 @@ create table if not exists profiles (
 );
 
 -- 2. Create Requests Table
-create table if not exists requests (
+create table requests (
   id text primary key,
   requester_id text references profiles(id),
   title text,
@@ -51,7 +58,7 @@ create table if not exists requests (
 );
 
 -- 3. Create Forum Tables
-create table if not exists forum_threads (
+create table forum_threads (
   id text primary key,
   author_id text references profiles(id),
   title text,
@@ -62,7 +69,7 @@ create table if not exists forum_threads (
   likes text[] default '{}'
 );
 
-create table if not exists forum_replies (
+create table forum_replies (
   id text primary key,
   thread_id text references forum_threads(id),
   author_id text references profiles(id),
@@ -71,7 +78,7 @@ create table if not exists forum_replies (
 );
 
 -- 4. Create Notifications Table
-create table if not exists notifications (
+create table notifications (
   id text primary key,
   user_id text references profiles(id),
   message text,
