@@ -1,8 +1,8 @@
 
 import React, { useState, useRef } from 'react';
-import { RequestItem, RequestStatus, User, DeliveryPreference, Fulfillment } from '../types';
+import { RequestItem, RequestStatus, User, DeliveryPreference, Fulfillment, Category } from '../types';
 import { Button } from './Button';
-import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play, ArrowLeft, Package, Clock, ShieldCheck, ShieldAlert, Heart, Lock } from 'lucide-react';
+import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play, ArrowLeft, Package, Clock, ShieldCheck, ShieldAlert, Heart, Lock, AlertTriangle, Layers } from 'lucide-react';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
 import { playPcmAudio } from '../utils/audio';
@@ -239,24 +239,26 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
         ) : (
         <>
         {/* Hero Header */}
-        <div className="relative h-56 shrink-0">
-             <div className="absolute inset-0 bg-slate-900/30 z-10"></div>
-             <img 
-                src={request.enrichedData?.imageUrl || `https://picsum.photos/seed/${request.id}/800/400`} 
-                alt={request.title} 
-                className="w-full h-full object-cover"
-            />
+        <div className="relative h-56 shrink-0 group">
+             <div className="absolute inset-0 bg-slate-900/30 z-10 transition-colors group-hover:bg-slate-900/10"></div>
+             
+             {request.enrichedData?.imageUrl ? (
+                 <img 
+                    src={request.enrichedData.imageUrl} 
+                    alt={request.title} 
+                    className="w-full h-full object-cover"
+                />
+             ) : (
+                 <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <Package className="w-16 h-16 text-white/50" />
+                 </div>
+             )}
             
             <button onClick={onClose} className="absolute top-4 right-4 z-20 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-md transition-colors"><X className="w-5 h-5"/></button>
 
             <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-900/90 to-transparent pt-20">
                 <div className="flex flex-wrap gap-2 mb-2">
                     <span className="bg-cyan-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-sm uppercase">{request.category}</span>
-                    <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/20 flex items-center gap-1">
-                        {request.deliveryPreference === DeliveryPreference.SHIPPING ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
-                        {request.deliveryPreference || 'Any'}
-                    </span>
-                    {distanceInfo && <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/20 flex items-center gap-1"><Navigation className="h-3 w-3" /> {distanceInfo}</span>}
                 </div>
                 <h1 className="text-3xl font-black text-white leading-tight">{request.title}</h1>
             </div>
@@ -264,44 +266,79 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
 
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50">
             <div className="p-6">
+                
+                {/* Meta Info Bar */}
+                <div className="flex gap-4 mb-6 overflow-x-auto pb-2 scrollbar-none">
+                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm shrink-0">
+                        {request.deliveryPreference === DeliveryPreference.SHIPPING ? <Truck className="w-4 h-4 text-blue-500" /> : <Handshake className="w-4 h-4 text-green-500" />}
+                        <div className="flex flex-col">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase">Method</span>
+                            <span className="text-xs font-bold text-slate-700">{request.deliveryPreference || 'Any'}</span>
+                        </div>
+                     </div>
+                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm shrink-0">
+                        <Layers className="w-4 h-4 text-purple-500" />
+                        <div className="flex flex-col">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase">Category</span>
+                            <span className="text-xs font-bold text-slate-700">{request.category}</span>
+                        </div>
+                     </div>
+                     {distanceInfo && (
+                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm shrink-0">
+                            <Navigation className="w-4 h-4 text-cyan-500" />
+                            <div className="flex flex-col">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase">Distance</span>
+                                <span className="text-xs font-bold text-slate-700">{distanceInfo}</span>
+                            </div>
+                        </div>
+                     )}
+                </div>
+
                 {/* User Info */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-6 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                     <div 
-                        className="flex items-center gap-3 cursor-pointer hover:bg-slate-100 p-2 rounded-xl transition-colors -ml-2"
+                        className="flex items-center gap-3 cursor-pointer p-1 rounded-xl transition-colors"
                         onClick={() => onViewProfile && onViewProfile(requester.id)}
                     >
-                        <img src={requester.avatarUrl} className="w-12 h-12 rounded-full border-2 border-white shadow-md bg-white" alt="" />
+                        <img src={requester.avatarUrl} className="w-10 h-10 rounded-full border border-slate-100 bg-slate-50 object-cover" alt="" />
                         <div>
-                            <div className="font-bold text-slate-800 text-lg">{requester.displayName}</div>
-                            <div className="text-xs text-slate-500 flex items-center gap-2">
+                            <div className="font-bold text-slate-800 text-sm leading-tight">{requester.displayName}</div>
+                            <div className="text-xs text-slate-500 flex items-center gap-1">
                                 <span>@{requester.handle}</span>
-                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {requester.location}</span>
+                                <span className="w-0.5 h-0.5 rounded-full bg-slate-300 mx-1"></span>
+                                <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" /> {requester.location}</span>
                             </div>
                         </div>
                     </div>
-                    <div className="text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-200">
-                        {timeAgo(request.createdAt)}
+                    <div className="text-xs font-bold text-slate-400 flex flex-col items-end">
+                        <span>Posted</span>
+                        <span className="text-slate-600">{timeAgo(request.createdAt)}</span>
                     </div>
                 </div>
 
                 {/* Content */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm mb-6 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-cyan-400 to-blue-500"></div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">The Request</h3>
-                    <p className="text-slate-700 leading-relaxed text-sm">{request.reason}</p>
-                    
-                    <button 
-                        onClick={handlePlayAudio}
-                        className="mt-4 flex items-center gap-2 text-xs font-bold text-cyan-600 hover:bg-cyan-50 px-3 py-2 rounded-lg transition-colors w-fit"
-                    >
-                        {isLoadingAudio ? <Loader2 className="w-4 h-4 animate-spin" /> : isPlayingAudio ? <StopCircle className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        {isLoadingAudio ? 'Loading Audio...' : isPlayingAudio ? 'Stop Reading' : 'Listen to Request'}
-                    </button>
+                <div className="mb-6">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <MessageCircle className="w-4 h-4" /> The Story
+                    </h3>
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-slate-700 leading-relaxed text-sm relative">
+                        {request.reason}
+                         <button 
+                            onClick={handlePlayAudio}
+                            className="absolute top-4 right-4 p-2 rounded-full bg-slate-50 hover:bg-cyan-50 text-slate-400 hover:text-cyan-600 transition-colors"
+                            title="Listen"
+                        >
+                            {isLoadingAudio ? <Loader2 className="w-4 h-4 animate-spin" /> : isPlayingAudio ? <StopCircle className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                        </button>
+                    </div>
                 </div>
 
+                {/* Link Preview Section */}
                 {request.productUrl && (
-                    <div className="mb-6">
+                    <div className="mb-6 animate-in fade-in slide-in-from-bottom-2">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <ExternalLink className="w-4 h-4" /> Reference Link
+                        </h3>
                         <LinkPreview url={request.productUrl} />
                     </div>
                 )}
@@ -374,7 +411,7 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                     </div>
 
                     {onAddComment && (
-                        <div className="sticky bottom-0 bg-white p-2 border border-slate-200 rounded-2xl shadow-sm flex items-center gap-2">
+                        <div className="sticky bottom-0 bg-white p-2 border border-slate-200 rounded-2xl shadow-sm flex items-center gap-2 z-10">
                              <input 
                                 type="text" 
                                 value={newComment}

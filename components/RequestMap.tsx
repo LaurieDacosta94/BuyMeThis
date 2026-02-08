@@ -2,10 +2,10 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { RequestItem, User, Category, RequestStatus } from '../types';
 import L from 'leaflet';
-import { MapPin } from 'lucide-react';
+import { MapPin, Lock } from 'lucide-react';
 
 interface RequestMapProps {
-  currentUser: User;
+  currentUser: User | null;
   requests: RequestItem[];
   onSelectRequest: (request: RequestItem) => void;
   categoryFilter?: Category | 'All';
@@ -48,13 +48,22 @@ export const RequestMap: React.FC<RequestMapProps> = ({
   }, [requests, categoryFilter, searchTerm]);
 
   useEffect(() => {
-    if (!mapContainer.current || !currentUser.coordinates) return;
+    if (!mapContainer.current) return;
 
-    if (map.current) return; // initialize map only once
+    // If no user or coordinates, we can still show map but centered generically or handle differently
+    // For this specific requirement, we rely on user coords to center "You"
+    const startLat = currentUser?.coordinates?.lat || 40.7128; // Default to NYC if unknown
+    const startLng = currentUser?.coordinates?.lng || -74.0060;
+
+    if (map.current) {
+        // Just update view if map exists
+        // map.current.setView([startLat, startLng], 13); 
+        return; 
+    }
 
     // Initialize Leaflet
     map.current = L.map(mapContainer.current).setView(
-        [currentUser.coordinates.lat, currentUser.coordinates.lng], 
+        [startLat, startLng], 
         13
     );
 
@@ -65,19 +74,21 @@ export const RequestMap: React.FC<RequestMapProps> = ({
 
     markersLayer.current = L.layerGroup().addTo(map.current);
 
-    // Add user location marker
-    const userIcon = L.divIcon({
-        className: 'custom-div-icon',
-        html: `<div class="w-4 h-4 bg-indigo-500 rounded-full border-2 border-white shadow-[0_0_15px_rgba(99,102,241,0.6)] animate-pulse"></div>`,
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
-    });
+    // Add user location marker ONLY if user is logged in and has coords
+    if (currentUser?.coordinates) {
+        const userIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div class="w-4 h-4 bg-indigo-500 rounded-full border-2 border-white shadow-[0_0_15px_rgba(99,102,241,0.6)] animate-pulse"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
 
-    L.marker([currentUser.coordinates.lat, currentUser.coordinates.lng], { icon: userIcon })
-     .addTo(map.current)
-     .bindPopup("<b>You are here</b>");
+        L.marker([currentUser.coordinates.lat, currentUser.coordinates.lng], { icon: userIcon })
+        .addTo(map.current)
+        .bindPopup("<b>You are here</b>");
+    }
 
-  }, [currentUser.coordinates]);
+  }, [currentUser?.coordinates]); // Re-run if coords change
 
   // Update markers when requests change
   useEffect(() => {
@@ -129,6 +140,21 @@ export const RequestMap: React.FC<RequestMapProps> = ({
   }, [visibleRequests, onSelectRequest]);
 
 
+  // Case 1: Not Logged In
+  if (!currentUser) {
+       return (
+        <div className="w-full h-96 bg-slate-900 rounded-2xl overflow-hidden shadow-2xl relative border border-slate-700 flex flex-col items-center justify-center text-center p-8">
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
+            <div className="relative z-10 bg-slate-900/80 p-6 rounded-2xl border border-slate-700 backdrop-blur-sm max-w-sm">
+                <Lock className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                <h3 className="text-white font-bold text-lg mb-2">Restricted Access</h3>
+                <p className="text-slate-400 text-sm mb-4">Please log in to access live geolocation data and nearby requests.</p>
+            </div>
+        </div>
+       );
+  }
+
+  // Case 2: Logged In but No Coordinates
   if (!currentUser.coordinates) {
     return (
       <div className="w-full h-96 bg-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 p-8 text-center">

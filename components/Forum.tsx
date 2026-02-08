@@ -11,50 +11,43 @@ const ForumPost: React.FC<{ author: User | undefined; content: string; date: str
     const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
     return (
-        <div className={`flex flex-col md:flex-row border border-slate-200 bg-white shadow-sm ${isOp ? 'border-t-4 border-t-indigo-500' : 'mt-4'}`}>
+        <div className={`flex flex-col md:flex-row border-b border-slate-200 ${isOp ? 'bg-indigo-50/10' : 'bg-white'}`}>
             {/* User Sidebar */}
-            <div className="md:w-56 bg-slate-50 border-b md:border-b-0 md:border-r border-slate-200 p-6 flex flex-col items-center text-center shrink-0">
-                <div className="relative mb-3 group">
-                    <img src={author?.avatarUrl || 'https://picsum.photos/100'} className="w-20 h-20 rounded-lg bg-white border-2 border-slate-200 object-cover shadow-sm" alt="Avatar" />
-                    {author?.isAdmin && <div className="absolute -top-2 -right-2 bg-purple-600 text-white p-1 rounded-full border-2 border-white shadow-sm" title="Admin"><Shield className="w-3 h-3" /></div>}
+            <div className="md:w-48 bg-slate-50 p-4 flex flex-col items-center text-center shrink-0 border-r border-slate-200">
+                <div className="relative mb-2 group">
+                    <img src={author?.avatarUrl || 'https://picsum.photos/100'} className="w-16 h-16 rounded bg-white border border-slate-300 object-cover shadow-sm" alt="Avatar" />
+                    {author?.isAdmin && <div className="absolute -top-2 -right-2 bg-purple-600 text-white p-0.5 rounded shadow-sm" title="Admin"><Shield className="w-3 h-3" /></div>}
                 </div>
-                <div className="font-bold text-slate-800 text-sm mb-1 truncate w-full">{author?.displayName || 'Unknown User'}</div>
+                <div className="font-bold text-slate-800 text-xs mb-1 truncate w-full px-2">{author?.displayName || 'Unknown User'}</div>
                 <div className="text-[10px] text-slate-500 font-mono mb-2 truncate w-full">@{author?.handle || 'unknown'}</div>
                 
-                <div className="space-y-1 w-full border-t border-slate-200 pt-3 mt-1">
-                    {author?.isAdmin && <div className="text-[10px] font-bold text-purple-600 uppercase bg-purple-50 py-0.5 rounded border border-purple-100">Administrator</div>}
-                    <div className="text-[10px] text-slate-500 flex items-center justify-center gap-1">
-                        <UserIcon className="w-3 h-3" /> Score: {author?.trustScore || 0}
-                    </div>
-                    {author?.location && (
-                         <div className="text-[10px] text-slate-400 flex items-center justify-center gap-1 truncate">
-                            <MapPin className="w-3 h-3" /> {author.location}
-                        </div>
-                    )}
+                <div className="space-y-1 w-full border-t border-slate-200 pt-2 mt-1">
+                    {author?.isAdmin && <div className="text-[9px] font-bold text-white uppercase bg-purple-600 py-0.5 rounded">ADMIN</div>}
+                    <div className="text-[9px] text-slate-500 font-mono">SCORE: {author?.trustScore || 0}</div>
                 </div>
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 flex flex-col min-h-[200px]">
+            <div className="flex-1 flex flex-col min-h-[150px]">
                 {/* Header */}
-                <div className="bg-white p-4 border-b border-slate-100 flex justify-between items-center">
-                     <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
+                <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-100 flex justify-between items-center h-10">
+                     <div className="text-[10px] text-slate-400 font-mono font-bold uppercase flex items-center gap-2">
+                        {isOp ? <span className="bg-indigo-600 text-white px-1.5 py-0.5 rounded text-[9px]">OP</span> : <span>REPLY</span>}
+                        <span className="w-px h-3 bg-slate-300"></span>
                         <Clock className="w-3 h-3" /> {formatDate(date)}
-                        {isOp && <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border border-indigo-200">Original Post</span>}
                      </div>
-                     <div className="text-xs font-bold text-slate-300">#{isOp ? '1' : 'REPLY'}</div>
+                     <div className="text-[10px] font-mono font-bold text-slate-300">#{date.substring(date.length-4)}</div>
                 </div>
 
                 {/* Body */}
-                <div className="p-6 flex-1 text-slate-800 text-sm leading-relaxed prose prose-slate max-w-none">
-                    {title && <h2 className={`text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 ${!isOp ? 'text-lg text-slate-700' : ''}`}>{title}</h2>}
-                    <div className="whitespace-pre-wrap font-sans">{content}</div>
+                <div className="p-6 flex-1 text-slate-800 text-sm leading-relaxed font-sans">
+                    {title && <h2 className="text-lg font-bold text-slate-900 mb-3 pb-2 border-b border-slate-100">{title}</h2>}
+                    <div className="whitespace-pre-wrap">{content}</div>
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-3 bg-slate-50/50 border-t border-slate-100 flex justify-end">
-                    {/* Placeholder for future actions like Report/Quote */}
-                    <button className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1 uppercase transition-colors">
+                <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100 flex justify-end">
+                    <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-1 uppercase transition-colors">
                         <Quote className="w-3 h-3" /> Quote
                     </button>
                 </div>
@@ -111,25 +104,25 @@ export const Forum: React.FC<ForumProps> = ({ currentUser, users, threads, onAdd
   if (activeView === 'create') {
     return (
       <div className="max-w-4xl mx-auto min-h-screen">
-        <div className="bg-slate-900 text-white px-6 py-4 font-bold text-sm uppercase flex justify-between items-center rounded-t-xl shadow-lg">
+        <div className="bg-slate-900 text-white px-6 py-4 font-bold text-sm uppercase flex justify-between items-center rounded-t-xl shadow-lg border-b-2 border-slate-900">
              <span>New Transmission</span>
              <button onClick={() => setActiveView('list')} className="text-slate-400 hover:text-white flex items-center gap-1 uppercase text-xs transition-colors"><ArrowLeft className="h-3 w-3" /> Cancel</button>
         </div>
-        <div className="bg-white border-x border-b border-slate-200 shadow-sm p-8 rounded-b-xl">
+        <div className="bg-white border-x-2 border-b-2 border-slate-900 shadow-sm p-8 rounded-b-xl">
              <form onSubmit={handleCreateSubmit} className="space-y-6">
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Subject Line</label>
-                    <input type="text" className="w-full px-4 py-3 border border-slate-300 rounded focus:border-indigo-600 outline-none font-bold text-slate-800" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required placeholder="What's on your mind?" />
+                    <input type="text" className="w-full px-4 py-3 border-2 border-slate-200 rounded focus:border-indigo-600 outline-none font-bold text-slate-800" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required placeholder="What's on your mind?" />
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Channel</label>
-                    <select className="w-full px-4 py-3 border border-slate-300 rounded focus:border-indigo-600 outline-none bg-white text-sm" value={newCategory} onChange={(e) => setNewCategory(e.target.value as ForumCategory)}>
+                    <select className="w-full px-4 py-3 border-2 border-slate-200 rounded focus:border-indigo-600 outline-none bg-white text-sm" value={newCategory} onChange={(e) => setNewCategory(e.target.value as ForumCategory)}>
                         {Object.values(ForumCategory).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Message Body</label>
-                    <textarea className="w-full px-4 py-3 border border-slate-300 rounded focus:border-indigo-600 outline-none h-64 font-mono text-sm leading-relaxed" value={newContent} onChange={(e) => setNewContent(e.target.value)} required placeholder="Type your message here..." />
+                    <textarea className="w-full px-4 py-3 border-2 border-slate-200 rounded focus:border-indigo-600 outline-none h-64 font-mono text-sm leading-relaxed" value={newContent} onChange={(e) => setNewContent(e.target.value)} required placeholder="Type your message here..." />
                 </div>
                 {error && <div className="bg-red-50 text-red-600 p-3 text-xs font-mono border border-red-200 rounded">{error}</div>}
                 <div className="flex justify-end border-t border-slate-100 pt-6"><Button type="submit" isLoading={isSubmitting} className="uppercase px-8">Transmit</Button></div>
@@ -146,9 +139,9 @@ export const Forum: React.FC<ForumProps> = ({ currentUser, users, threads, onAdd
             <ArrowLeft className="h-4 w-4" /> Return to Index
         </button>
 
-        <div className="bg-white rounded-xl shadow-hard border-2 border-slate-900 overflow-hidden">
+        <div className="bg-white rounded-t-xl rounded-b-xl shadow-hard border-2 border-slate-900 overflow-hidden">
              {/* Header */}
-             <div className="bg-slate-900 text-white px-6 py-4 font-bold text-sm uppercase flex justify-between items-center">
+             <div className="bg-slate-900 text-white px-6 py-4 font-bold text-sm uppercase flex justify-between items-center border-b border-slate-700">
                  <div className="flex items-center gap-2">
                     <span className="w-3 h-3 bg-red-500 inline-block animate-pulse rounded-full"></span>
                     <span>TRANSMISSION_LOG // {selectedThread.id.substring(0,8)}</span>
@@ -158,19 +151,19 @@ export const Forum: React.FC<ForumProps> = ({ currentUser, users, threads, onAdd
                  </div>
              </div>
 
-             <div className="p-6 bg-slate-50">
+             <div className="bg-slate-200 p-0">
                 {/* AI Summary Section */}
                 {(selectedThread.content.length > 500 || selectedThread.replies.length > 3) && (
-                    <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-lg p-4 shadow-sm">
-                        <div className="flex items-start gap-3">
-                            <div className="bg-white p-2 rounded-full shadow-sm text-indigo-500">
+                    <div className="bg-white border-b border-slate-200 p-4">
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-start gap-3">
+                            <div className="bg-white p-1.5 rounded-md shadow-sm text-indigo-500">
                                 <Sparkles className="w-4 h-4" />
                             </div>
                             <div className="flex-1">
-                                <h4 className="text-xs font-bold text-indigo-800 uppercase mb-1">AI Synopsis</h4>
+                                <h4 className="text-[10px] font-bold text-indigo-800 uppercase mb-1">AI Synopsis</h4>
                                 {!aiSummary ? (
                                     <button onClick={generateSummary} disabled={isSummarizing} className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline decoration-dotted">
-                                        {isSummarizing ? 'Generating summary...' : 'Generate a quick summary of this discussion'}
+                                        {isSummarizing ? 'Generating summary...' : 'Generate a quick summary'}
                                     </button>
                                 ) : (
                                     <p className="text-xs text-slate-700 leading-relaxed font-medium">{aiSummary}</p>
@@ -190,42 +183,42 @@ export const Forum: React.FC<ForumProps> = ({ currentUser, users, threads, onAdd
                 />
                 
                 {/* Replies */}
-                <div className="mt-6 space-y-6">
-                    {selectedThread.replies.map((reply) => (
-                        <ForumPost 
-                            key={reply.id} 
-                            author={users[reply.authorId]} 
-                            title={reply.title}
-                            content={reply.content} 
-                            date={reply.createdAt} 
-                        />
-                    ))}
-                </div>
+                {selectedThread.replies.map((reply) => (
+                    <ForumPost 
+                        key={reply.id} 
+                        author={users[reply.authorId]} 
+                        title={reply.title}
+                        content={reply.content} 
+                        date={reply.createdAt} 
+                    />
+                ))}
 
                 {/* Reply Box */}
-                <div className="mt-8 border border-slate-200 bg-white shadow-sm p-6 rounded-lg">
-                    <h4 className="text-xs font-bold uppercase mb-4 text-slate-500 flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Post a Reply</h4>
-                    <form onSubmit={handleReplySubmit} className="space-y-3">
-                        <div>
-                            <input 
-                                type="text" 
-                                className="w-full border border-slate-200 bg-slate-50 p-3 text-sm font-bold focus:border-indigo-600 focus:bg-white outline-none rounded transition-colors" 
-                                value={replyTitle} 
-                                onChange={(e) => setReplyTitle(e.target.value)} 
-                                placeholder="Subject (Optional)" 
+                <div className="p-6 bg-slate-100 border-t border-slate-200">
+                    <div className="bg-white border border-slate-200 shadow-sm p-4 rounded-lg">
+                        <h4 className="text-xs font-bold uppercase mb-4 text-slate-500 flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Post a Reply</h4>
+                        <form onSubmit={handleReplySubmit} className="space-y-3">
+                            <div>
+                                <input 
+                                    type="text" 
+                                    className="w-full border-2 border-slate-200 bg-slate-50 p-3 text-sm font-bold focus:border-indigo-600 focus:bg-white outline-none rounded transition-colors" 
+                                    value={replyTitle} 
+                                    onChange={(e) => setReplyTitle(e.target.value)} 
+                                    placeholder="Subject (Optional)" 
+                                />
+                            </div>
+                            <textarea 
+                                className="w-full border-2 border-slate-200 bg-slate-50 p-4 font-mono text-sm h-32 focus:border-indigo-600 focus:bg-white outline-none rounded transition-colors" 
+                                value={replyContent} 
+                                onChange={(e) => setReplyContent(e.target.value)} 
+                                placeholder={currentUser ? "Add your voice to the discussion..." : "Please log in to reply."} 
+                                disabled={!currentUser} 
                             />
-                        </div>
-                        <textarea 
-                            className="w-full border border-slate-200 bg-slate-50 p-4 font-mono text-sm h-32 focus:border-indigo-600 focus:bg-white outline-none rounded transition-colors" 
-                            value={replyContent} 
-                            onChange={(e) => setReplyContent(e.target.value)} 
-                            placeholder={currentUser ? "Add your voice to the discussion..." : "Please log in to reply."} 
-                            disabled={!currentUser} 
-                        />
-                        <div className="flex justify-end">
-                            <Button type="submit" disabled={!replyContent.trim() || !currentUser} className="uppercase px-6">Post Reply</Button>
-                        </div>
-                    </form>
+                            <div className="flex justify-end">
+                                <Button type="submit" disabled={!replyContent.trim() || !currentUser} className="uppercase px-6">Post Reply</Button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
              </div>
         </div>

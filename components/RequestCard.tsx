@@ -1,8 +1,8 @@
 
 import React, { useState, useRef } from 'react';
-import { RequestItem, RequestStatus, User } from '../types';
+import { RequestItem, RequestStatus, User, Category, DeliveryPreference } from '../types';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
-import { MapPin, Volume2, Loader2, StopCircle, Mic, Users, Trash2, MessageCircle, Send, Heart, Play, Pause, ExternalLink, CornerDownRight } from 'lucide-react';
+import { MapPin, Volume2, Loader2, StopCircle, Mic, Users, Trash2, MessageCircle, Send, Heart, Play, Pause, ExternalLink, CornerDownRight, Truck, Handshake, Info } from 'lucide-react';
 import { Button } from './Button';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { playPcmAudio } from '../utils/audio';
@@ -29,6 +29,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
+  const [imgError, setImgError] = useState(false);
   
   // TTS State
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -148,6 +149,18 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   const stopRecording = () => { if (mediaRecorderRef.current && isRecordingComment) { mediaRecorderRef.current.stop(); setIsRecordingComment(false); } };
   const handleDelete = (e: React.MouseEvent) => { e.stopPropagation(); if (confirm("Delete?") && onDelete) onDelete(request); };
 
+  // Helper to determine fallback gradient based on category
+  const getCategoryGradient = (cat: Category) => {
+      switch(cat) {
+          case Category.ESSENTIALS: return 'bg-gradient-to-br from-red-400 to-orange-500';
+          case Category.EDUCATION: return 'bg-gradient-to-br from-blue-400 to-indigo-500';
+          case Category.ART_HOBBY: return 'bg-gradient-to-br from-pink-400 to-purple-500';
+          case Category.FAMILY: return 'bg-gradient-to-br from-yellow-400 to-orange-500';
+          case Category.TOOLS: return 'bg-gradient-to-br from-slate-400 to-slate-600';
+          default: return 'bg-gradient-to-br from-cyan-400 to-blue-500';
+      }
+  };
+
   return (
     <div 
         onClick={(e) => {
@@ -158,13 +171,24 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         className={`group bg-white rounded-3xl shadow-glow border border-white/50 overflow-hidden hover:shadow-glow-hover transition-all duration-300 relative flex flex-col h-full ${isInactive ? 'opacity-80 grayscale-[0.5]' : ''}`}
     >
       {/* Image Header */}
-      <div className="relative h-48 overflow-hidden">
-        <div className="absolute inset-0 bg-slate-200" />
-        <img 
-          src={request.enrichedData?.imageUrl || `https://picsum.photos/seed/${request.id}/400/200`} 
-          alt={request.title} 
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-        />
+      <div className={`relative h-48 overflow-hidden ${!request.enrichedData?.imageUrl || imgError ? getCategoryGradient(request.category) : 'bg-slate-200'}`}>
+        {!imgError && request.enrichedData?.imageUrl && (
+            <img 
+            src={request.enrichedData.imageUrl} 
+            alt={request.title} 
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+        )}
+        
+        {/* If no image or error, show category icon overlay */}
+        {(!request.enrichedData?.imageUrl || imgError) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white/90">
+                <Info className="w-12 h-12 mb-2 opacity-50" />
+                <span className="font-bold text-lg tracking-widest uppercase opacity-80">{request.category}</span>
+            </div>
+        )}
+
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent"></div>
         
         {/* Top Badges */}
@@ -179,9 +203,15 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             )}
         </div>
         
-        {/* Category Badge */}
-        <div className="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-white shadow-sm uppercase tracking-wide">
-            {request.category}
+        {/* Delivery Preference Badge */}
+        <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+            <div className="bg-slate-900/80 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-white shadow-sm uppercase tracking-wide">
+                {request.category}
+            </div>
+            <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-slate-700 shadow-sm flex items-center gap-1 uppercase tracking-wide">
+                {request.deliveryPreference === DeliveryPreference.SHIPPING ? <Truck className="w-3 h-3"/> : <Handshake className="w-3 h-3" />}
+                {request.deliveryPreference}
+            </div>
         </div>
 
         {/* Status Overlay */}
@@ -233,7 +263,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         </p>
 
         {request.productUrl && (
-             <a href={request.productUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] font-bold text-cyan-600 hover:text-cyan-700 mb-4 bg-cyan-50 p-2 rounded-xl w-fit transition-colors">
+             <a href={request.productUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 text-[10px] font-bold text-cyan-600 hover:text-cyan-700 mb-4 bg-cyan-50 p-2 rounded-xl w-fit transition-colors">
                  <ExternalLink className="w-3 h-3" /> Product Link
              </a>
         )}
