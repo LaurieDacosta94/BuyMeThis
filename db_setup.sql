@@ -14,6 +14,7 @@ create table profiles (
   avatar_url text,
   banner_url text, -- New Column
   location text,
+  password text, -- Added password column
   trust_score integer default 50,
   badges jsonb default '[]'::jsonb,
   projects text[] default '{}',

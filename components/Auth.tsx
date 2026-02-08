@@ -8,9 +8,6 @@ interface AuthProps {
   onLoginSuccess: () => void;
 }
 
-const MIGRATION_SQL = `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin boolean DEFAULT false;`;
-const NEON_SETUP_SQL = `-- Setup SQL`; // Kept short for brevity in this specific update as logic doesn't change
-
 export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   const [showSetup, setShowSetup] = useState(!db.isNeon);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -29,11 +26,19 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
     setLoading(true);
     setError(null);
     try {
-      if (isAdminAttempt) { await db.loginAsAdmin(password); onLoginSuccess(); return; }
+      if (isAdminAttempt) { 
+          await db.loginAsAdmin(password); 
+          onLoginSuccess(); 
+          return; 
+      }
       if (mode === 'signup') {
-        await db.signUp(email, { displayName, handle: handle.replace('@', ''), location, bio: "Ready." });
+        if (!password) throw new Error("Password is required");
+        await db.signUp(email, { displayName, handle: handle.replace('@', ''), location, bio: "Ready.", password });
         onLoginSuccess();
-      } else { await db.signIn(email); onLoginSuccess(); }
+      } else { 
+          await db.signIn(email, password); 
+          onLoginSuccess(); 
+      }
     } catch (err: any) { setError(err.message || "Auth failed"); } finally { setLoading(false); }
   };
 
@@ -64,10 +69,10 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                     </div>
                   </div>
               )}
-              <input type="text" placeholder={mode === 'login' ? "Handle or Email" : "Email"} className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input type="text" placeholder={mode === 'login' ? "Handle or Display Name" : "Email / Handle"} className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm" value={email} onChange={(e) => setEmail(e.target.value)} required />
               
-              <div className={`transition-all duration-300 ${isAdminAttempt ? 'opacity-100 max-h-20' : 'opacity-0 max-h-0 overflow-hidden'}`}>
-                 <input type="password" placeholder="System Password" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm font-mono" value={password} onChange={(e) => setPassword(e.target.value)} required={isAdminAttempt} />
+              <div className="transition-all duration-300">
+                 <input type="password" placeholder="Password" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm font-mono" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
 
               {error && <div className="bg-red-50 border border-red-200 text-red-600 p-2 text-xs font-mono">{error}</div>}

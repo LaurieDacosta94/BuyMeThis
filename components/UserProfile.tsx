@@ -43,7 +43,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
       </div>
       
       <div className="px-6 pb-6 relative">
-        <div className="flex flex-col md:flex-row gap-6 -mt-16 mb-6 relative z-10 items-end">
+        <div className="flex flex-col md:flex-row gap-6 -mt-16 mb-6 relative z-10 items-center md:items-end">
             {/* Square Avatar */}
             <div className="relative group">
                 <img src={user.avatarUrl} alt={user.displayName} className="h-32 w-32 md:h-40 md:w-40 bg-white object-cover border-4 border-white shadow-sm rounded-none" />
@@ -54,14 +54,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
                 )}
             </div>
             
-            <div className="flex-1 pb-2">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-1 pb-2 w-full md:w-auto">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-center md:text-left">
                     <div>
-                        <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+                        <h2 className="text-3xl font-bold text-slate-900 flex items-center justify-center md:justify-start gap-3">
                             {user.displayName}
                             {isCurrentUser && <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 font-bold uppercase">You</span>}
                         </h2>
-                        <div className="flex items-center gap-2 mt-1 text-slate-500">
+                        <div className="flex items-center justify-center md:justify-start gap-2 mt-1 text-slate-500">
                             <p className="font-mono text-sm">@{user.handle}</p>
                             {user.badges.length > 0 && (
                                 <div className="flex gap-1 ml-2">
@@ -71,7 +71,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
                         </div>
                     </div>
 
-                    <div className="flex flex-col items-start md:items-end gap-2">
+                    <div className="flex flex-col items-center md:items-end gap-2 w-full md:w-auto">
                         {isCurrentUser && (
                             <button onClick={onEditProfile} className="text-xs bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 font-bold uppercase tracking-wide">
                                 Edit Profile
@@ -88,7 +88,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
             </div>
         </div>
         
-        <p className="max-w-3xl mb-8 text-slate-700 leading-relaxed font-medium border-l-4 border-slate-200 pl-4">{user.bio || "No bio yet."}</p>
+        <p className="max-w-3xl mb-8 text-slate-700 leading-relaxed font-medium border-l-4 border-slate-200 pl-4 mx-auto md:mx-0 text-center md:text-left">{user.bio || "No bio yet."}</p>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-slate-200 mb-8 bg-slate-50">

@@ -16,7 +16,10 @@ export default defineConfig(({ mode }) => {
       'process.env.VITE_DATABASE_URL': JSON.stringify(env.VITE_DATABASE_URL || ''),
       
       // Admin Credentials
-      'process.env.ADMIN_PASSWORD': JSON.stringify(env.ADMIN_PASSWORD || 'secret123')
+      'process.env.ADMIN_PASSWORD': JSON.stringify(env.ADMIN_PASSWORD || 'secret123'),
+
+      // Mapbox Token
+      'process.env.VITE_MAPBOX_TOKEN': JSON.stringify(env.VITE_MAPBOX_TOKEN || '')
     }
   };
 });

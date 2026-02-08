@@ -19,13 +19,21 @@ export const uploadImage = async (file: File): Promise<string> => {
     });
 };
 
+// Simple hash function for demo purposes (using Web Crypto API)
+const hashPassword = async (password: string) => {
+    const msgBuffer = new TextEncoder().encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 // --- DB INTERFACE ---
 
 export const db = {
   isNeon: useNeon,
 
   // --- AUTH ---
-  async signUp(email: string, profileData: Partial<User>) {
+  async signUp(email: string, profileData: Partial<User> & { password?: string }) {
     const id = uuidv4();
     const newUser: User = {
       id,
@@ -43,14 +51,16 @@ export const db = {
       isAdmin: false
     };
 
+    const passwordHash = profileData.password ? await hashPassword(profileData.password) : null;
+
     if (sql) {
         await sql`
-            INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies, is_admin)
-            VALUES (${id}, ${newUser.displayName}, ${newUser.handle}, ${newUser.bio}, ${newUser.avatarUrl}, ${newUser.bannerUrl}, ${newUser.location}, ${newUser.trustScore}, ${JSON.stringify(newUser.badges)}, ${newUser.projects}, ${newUser.hobbies}, ${newUser.isAdmin})
+            INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, password, trust_score, badges, projects, hobbies, is_admin)
+            VALUES (${id}, ${newUser.displayName}, ${newUser.handle}, ${newUser.bio}, ${newUser.avatarUrl}, ${newUser.bannerUrl}, ${newUser.location}, ${passwordHash}, ${newUser.trustScore}, ${JSON.stringify(newUser.badges)}, ${newUser.projects}, ${newUser.hobbies}, ${newUser.isAdmin})
         `;
     } else {
         const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
-        users[id] = newUser;
+        users[id] = { ...newUser, password: passwordHash };
         localStorage.setItem('bm_users', JSON.stringify(users));
     }
     
@@ -58,11 +68,22 @@ export const db = {
     return newUser;
   },
 
-  async signIn(handleOrEmail: string) {
+  async signIn(handleOrEmail: string, password?: string) {
       if (sql) {
         const result = await sql`SELECT * FROM profiles WHERE handle = ${handleOrEmail} OR display_name = ${handleOrEmail} LIMIT 1`;
         if (result.length > 0) {
             const u = result[0];
+            
+            // Verify Password if one is stored and provided
+            if (u.password && password) {
+                const inputHash = await hashPassword(password);
+                if (inputHash !== u.password) {
+                    throw new Error("Invalid password");
+                }
+            } else if (u.password && !password) {
+                throw new Error("Password required");
+            }
+
             const user: User = {
                 id: u.id,
                 displayName: u.display_name,
@@ -83,8 +104,30 @@ export const db = {
         }
       } else {
           const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
-          const user = Object.values(users).find((u: any) => u.handle === handleOrEmail || u.displayName === handleOrEmail) as User | undefined;
-          if (user) {
+          const userEntry = Object.values(users).find((u: any) => u.handle === handleOrEmail || u.displayName === handleOrEmail) as any;
+          
+          if (userEntry) {
+              if (userEntry.password && password) {
+                  const inputHash = await hashPassword(password);
+                  if (inputHash !== userEntry.password) throw new Error("Invalid password");
+              }
+              
+              const user: User = {
+                  id: userEntry.id,
+                  displayName: userEntry.displayName,
+                  handle: userEntry.handle,
+                  bio: userEntry.bio,
+                  avatarUrl: userEntry.avatarUrl,
+                  bannerUrl: userEntry.bannerUrl,
+                  location: userEntry.location,
+                  trustScore: userEntry.trustScore,
+                  badges: userEntry.badges,
+                  projects: userEntry.projects,
+                  hobbies: userEntry.hobbies,
+                  coordinates: userEntry.coordinates,
+                  isAdmin: userEntry.isAdmin
+              };
+
               this.setSession(user.id);
               return user;
           }
@@ -115,6 +158,7 @@ export const db = {
 
       if (sql) {
           // Upsert admin user to ensure they exist and have is_admin=true
+          // Note: Admin in this demo uses environment password, not DB password column
           await sql`
             INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies, is_admin)
             VALUES (${adminUser.id}, ${adminUser.displayName}, ${adminUser.handle}, ${adminUser.bio}, ${adminUser.avatarUrl}, ${adminUser.bannerUrl}, ${adminUser.location}, ${adminUser.trustScore}, ${JSON.stringify(adminUser.badges)}, ${adminUser.projects}, ${adminUser.hobbies}, ${adminUser.isAdmin})
@@ -214,7 +258,7 @@ export const db = {
           `;
       } else {
           const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
-          users[user.id] = user;
+          users[user.id] = { ...users[user.id], ...user }; // Merge to preserve password
           localStorage.setItem('bm_users', JSON.stringify(users));
       }
   },

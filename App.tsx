@@ -633,7 +633,7 @@ const App: React.FC = () => {
       </div>
 
       {activeRequest && currentUser && <FulfillmentModal isOpen={isFulfillmentModalOpen} onClose={() => { setIsFulfillmentModalOpen(false); setActiveRequest(null); }} request={activeRequest} currentUser={currentUser} onCommit={handleCommit} onConfirmPurchase={handleConfirmPurchase} onUpdateTracking={handleUpdateTracking} />}
-      {detailsRequest && <RequestDetailsModal isOpen={!!detailsRequest} onClose={() => setDetailsRequest(null)} request={detailsRequest} requester={users[detailsRequest.requesterId]} onFulfill={() => handleOpenFulfillment(detailsRequest)} currentUser={currentUser} candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} onDelete={handleDeleteRequest} />}
+      {detailsRequest && <RequestDetailsModal isOpen={!!detailsRequest} onClose={() => setDetailsRequest(null)} request={detailsRequest} requester={users[detailsRequest.requesterId]} onFulfill={() => handleOpenFulfillment(detailsRequest)} currentUser={currentUser} candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} onDelete={handleDeleteRequest} onAddComment={handleAddComment} />}
       {thankYouModalRequest && <ThankYouModal isOpen={!!thankYouModalRequest} onClose={() => setThankYouModalRequest(null)} itemTitle={thankYouModalRequest.title} originalReason={thankYouModalRequest.reason} donorName={users[thankYouModalRequest.fulfillerId || '']?.displayName} onSubmit={submitThankYou} />}
       {currentUser && <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} user={currentUser} onSave={handleUpdateUser} />}
       
