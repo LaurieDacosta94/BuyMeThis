@@ -13,10 +13,10 @@ import { Forum } from './components/Forum';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Hero } from './components/Hero';
 import { RequestItem, RequestStatus, LocationFilter, User, Notification, Category, ForumThread, ForumCategory, ForumReply } from './types';
-import { Filter, Search, Package, Gift, ArrowLeft, Map, List } from 'lucide-react';
-import { calculateDistance } from './utils/geo';
+import { Filter, Search, Package, Gift, ArrowLeft, Map, List, Loader2 } from 'lucide-react';
+import { supabase } from './services/supabase';
 
-// MOCK DATA GENERATORS
+// MOCK USERS (We keep users local for the demo, but sync their requests)
 const MOCK_USERS: Record<string, User> = {
   'user_1': {
     id: 'user_1',
@@ -64,72 +64,6 @@ const MOCK_USERS: Record<string, User> = {
   }
 };
 
-const INITIAL_REQUESTS: RequestItem[] = [
-  {
-    id: 'req_1',
-    requesterId: 'user_2',
-    title: 'Acrylic Paint Set',
-    productUrl: 'https://example.com/paints',
-    reason: 'I am running low on primary colors for my final thesis piece. This set has everything I need to finish the series.',
-    shippingAddress: 'Sarah Chen\n123 Art Ave\nSeattle, WA 98101',
-    status: RequestStatus.OPEN,
-    category: Category.ART_HOBBY,
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    location: 'Seattle, WA',
-    coordinates: { lat: 47.6062, lng: -122.3321 },
-    enrichedData: {
-      title: 'Professional Acrylics 12ct',
-      price: 24.99,
-      description: 'High viscosity acrylic paint set.',
-      imageUrl: 'https://picsum.photos/seed/req1/400/300'
-    },
-    comments: [
-      { id: 'c1', userId: 'user_1', text: 'Do you need heavy body or fluid acrylics?', createdAt: new Date(Date.now() - 3600000).toISOString() }
-    ]
-  },
-  {
-    id: 'req_2',
-    requesterId: 'user_3',
-    title: 'Clean Code Book',
-    productUrl: 'https://example.com/book',
-    reason: 'Trying to improve my coding standards as I apply for my first junior dev role.',
-    shippingAddress: 'Marcus Johnson\n456 Tech Blvd\nAustin, TX 78701',
-    status: RequestStatus.FULFILLED,
-    category: Category.EDUCATION,
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    location: 'Austin, TX',
-    coordinates: { lat: 30.2672, lng: -97.7431 },
-    enrichedData: {
-      title: 'Clean Code: A Handbook',
-      price: 35.00,
-      description: 'Software engineering principles.',
-      imageUrl: 'https://picsum.photos/seed/req2/400/300'
-    },
-    comments: []
-  },
-  {
-     id: 'req_3',
-     requesterId: 'user_1',
-     title: 'Garden Rake',
-     productUrl: 'https://example.com/rake',
-     reason: 'Volunteering at the community garden this weekend and we are short on tools.',
-     shippingAddress: 'Alex Rivera\n789 Green St\nPortland, OR 97204',
-     status: RequestStatus.OPEN,
-     category: Category.TOOLS,
-     createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-     location: 'Portland, OR',
-     // Coordinates slightly offset from user_1 to show on map
-     coordinates: { lat: 45.5200, lng: -122.6800 },
-     enrichedData: {
-       title: 'Heavy Duty Bow Rake',
-       price: 22.50,
-       description: 'Steel tine rake for gardening.',
-       imageUrl: 'https://picsum.photos/seed/req3/400/300'
-     },
-     comments: []
-  }
-];
-
 const INITIAL_THREADS: ForumThread[] = [
   {
     id: 'th_1',
@@ -175,17 +109,11 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState('feed'); 
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
   const [feedMode, setFeedMode] = useState<'list' | 'map'>('list');
+  const [loading, setLoading] = useState(true);
 
   // Data Persistence
-  const [users, setUsers] = useState<Record<string, User>>(() => {
-    const saved = localStorage.getItem('buymethis_users');
-    return saved ? JSON.parse(saved) : MOCK_USERS;
-  });
-
-  const [requests, setRequests] = useState<RequestItem[]>(() => {
-    const saved = localStorage.getItem('buymethis_requests');
-    return saved ? JSON.parse(saved) : INITIAL_REQUESTS;
-  });
+  const [users, setUsers] = useState<Record<string, User>>(MOCK_USERS);
+  const [requests, setRequests] = useState<RequestItem[]>([]);
   
   const [forumThreads, setForumThreads] = useState<ForumThread[]>(() => {
     const saved = localStorage.getItem('buymethis_threads');
@@ -212,14 +140,63 @@ const App: React.FC = () => {
   const currentUser = users[currentUserId];
   const allUsers = Object.values(users);
 
-  // Persistence Effects
-  useEffect(() => {
-    localStorage.setItem('buymethis_users', JSON.stringify(users));
-  }, [users]);
+  // --- SUPABASE INTEGRATION ---
+
+  const fetchRequests = async () => {
+    try {
+      const { data, error } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      
+      if (data) {
+        // Map DB columns to our Typescript Interface
+        const mappedRequests: RequestItem[] = data.map((row: any) => ({
+          id: row.id,
+          requesterId: row.requester_id,
+          title: row.title,
+          reason: row.reason,
+          category: row.category as Category,
+          status: row.status as RequestStatus,
+          location: row.location,
+          createdAt: row.created_at,
+          coordinates: row.coordinates_lat ? { lat: row.coordinates_lat, lng: row.coordinates_lng } : undefined,
+          shippingAddress: row.shipping_address,
+          fulfillerId: row.fulfiller_id,
+          trackingNumber: row.tracking_number,
+          proofOfPurchaseImage: row.proof_of_purchase_image,
+          giftMessage: row.gift_message,
+          thankYouMessage: row.thank_you_message,
+          receiptVerificationStatus: row.receipt_verification_status,
+          enrichedData: row.enriched_data,
+          comments: row.comments || [],
+          productUrl: '' // Simple fallback
+        }));
+        setRequests(mappedRequests);
+      }
+    } catch (err) {
+      console.error('Error fetching requests:', err);
+      showToast('Failed to load requests from database', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem('buymethis_requests', JSON.stringify(requests));
-  }, [requests]);
+    fetchRequests();
+    
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel('public:requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
+        fetchRequests();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // --- END SUPABASE ---
 
   useEffect(() => {
     localStorage.setItem('buymethis_notifications', JSON.stringify(notifications));
@@ -267,27 +244,23 @@ const App: React.FC = () => {
     setIsEditProfileOpen(false);
   };
 
-  // Badge Logic
   const checkAndAwardBadges = (user: User, completedRequestsCount: number, hasVerifiedReceipt: boolean) => {
     const newBadges = [...user.badges];
     let awarded = false;
     let badgeName = '';
 
-    // First Gift
     if (completedRequestsCount >= 1 && !newBadges.find(b => b.id === 'first_gift')) {
       newBadges.push({ id: 'first_gift', label: 'First Gift', icon: 'heart', description: 'Fulfilled your first request', color: 'bg-pink-500' });
       awarded = true;
       badgeName = 'First Gift';
     }
 
-    // Community Star
     if (completedRequestsCount >= 3 && !newBadges.find(b => b.id === 'community_star')) {
       newBadges.push({ id: 'community_star', label: 'Community Star', icon: 'star', description: 'Fulfilled 3 requests', color: 'bg-indigo-500' });
       awarded = true;
       badgeName = 'Community Star';
     }
     
-    // Verified Hero (If receipt is verified)
     if (hasVerifiedReceipt && !newBadges.find(b => b.id === 'verified_hero')) {
        newBadges.push({ id: 'verified_hero', label: 'Verified Hero', icon: 'shield', description: 'Provided verified proof of purchase', color: 'bg-teal-500' });
        awarded = true;
@@ -300,7 +273,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Action Handlers
   const handleSwitchUser = (userId: string) => {
     setCurrentUserId(userId);
     setViewingProfileId(null);
@@ -322,10 +294,35 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleCreateRequest = (newRequest: RequestItem) => {
-    setRequests([newRequest, ...requests]);
-    handleNavigate('feed');
-    showToast('Request posted successfully!');
+  const handleCreateRequest = async (newRequest: RequestItem) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('requests').insert({
+        id: newRequest.id,
+        requester_id: newRequest.requesterId,
+        title: newRequest.title,
+        reason: newRequest.reason,
+        category: newRequest.category,
+        status: newRequest.status,
+        location: newRequest.location,
+        created_at: newRequest.createdAt,
+        coordinates_lat: newRequest.coordinates?.lat,
+        coordinates_lng: newRequest.coordinates?.lng,
+        shipping_address: newRequest.shippingAddress,
+        enriched_data: newRequest.enrichedData
+      });
+      
+      if (error) throw error;
+      
+      handleNavigate('feed');
+      showToast('Request posted successfully!');
+      // Fetch will happen automatically via realtime subscription
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save request', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
   
   const handleAddForumThread = (thread: ForumThread) => {
@@ -341,7 +338,6 @@ const App: React.FC = () => {
       return t;
     }));
     
-    // Notify thread author
     const thread = forumThreads.find(t => t.id === reply.threadId);
     if (thread && thread.authorId !== currentUser.id) {
        addNotification(thread.authorId, `${currentUser.displayName} replied to your discussion: "${thread.title}"`);
@@ -353,163 +349,190 @@ const App: React.FC = () => {
     setIsFulfillmentModalOpen(true);
   };
 
-  const handleCommit = (requestId: string) => {
+  const handleCommit = async (requestId: string) => {
     const targetRequest = requests.find(r => r.id === requestId);
     if (!targetRequest) return;
 
-    setRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        return { ...req, status: RequestStatus.PENDING, fulfillerId: currentUser.id };
-      }
-      return req;
-    }));
+    try {
+      const { error } = await supabase
+        .from('requests')
+        .update({ status: RequestStatus.PENDING, fulfiller_id: currentUser.id })
+        .eq('id', requestId);
 
-    setActiveRequest(prev => prev ? { ...prev, status: RequestStatus.PENDING, fulfillerId: currentUser.id } : null);
-    
-    addNotification(
-      targetRequest.requesterId, 
-      `${currentUser.displayName} has committed to buy your "${targetRequest.title}"! They will confirm purchase soon.`,
-      requestId
-    );
+      if (error) throw error;
 
-    showToast('You committed to this request! Don\'t forget to buy it.');
+      setActiveRequest(prev => prev ? { ...prev, status: RequestStatus.PENDING, fulfillerId: currentUser.id } : null);
+      
+      addNotification(
+        targetRequest.requesterId, 
+        `${currentUser.displayName} has committed to buy your "${targetRequest.title}"! They will confirm purchase soon.`,
+        requestId
+      );
+
+      showToast('You committed to this request! Don\'t forget to buy it.');
+    } catch (err) {
+      showToast('Failed to update request', 'error');
+    }
   };
 
-  const handleConfirmPurchase = (requestId: string, orderId: string, receiptImage?: string, giftMessage?: string, verificationStatus?: 'verified' | 'warning') => {
+  const handleConfirmPurchase = async (requestId: string, orderId: string, receiptImage?: string, giftMessage?: string, verificationStatus?: 'verified' | 'warning') => {
     const targetRequest = requests.find(r => r.id === requestId);
-    
-    setRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        return { 
-          ...req, 
-          status: RequestStatus.FULFILLED, 
-          trackingNumber: orderId,
-          proofOfPurchaseImage: receiptImage,
-          giftMessage: giftMessage,
-          receiptVerificationStatus: verificationStatus
-        };
-      }
-      return req;
-    }));
-    
-    setIsFulfillmentModalOpen(false);
-    setActiveRequest(null);
+    if (!targetRequest) return;
 
-    if (targetRequest) {
+    try {
+      const { error } = await supabase
+        .from('requests')
+        .update({ 
+          status: RequestStatus.FULFILLED, 
+          tracking_number: orderId,
+          proof_of_purchase_image: receiptImage,
+          gift_message: giftMessage,
+          receipt_verification_status: verificationStatus
+        })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      setIsFulfillmentModalOpen(false);
+      setActiveRequest(null);
+
       addNotification(
         targetRequest.requesterId,
         `${currentUser.displayName} has purchased your item! Order ID: ${orderId}.${verificationStatus === 'verified' ? ' Proof of Purchase Verified!' : ''}`,
         requestId
       );
-    }
-    
-    // Calculate new stats for badges
-    const myFulfillments = requests.filter(r => r.fulfillerId === currentUser.id && (r.status === RequestStatus.FULFILLED || r.status === RequestStatus.RECEIVED));
-    const currentCount = myFulfillments.length + 1;
-    
-    // Pass verification status for badges logic
-    checkAndAwardBadges(currentUser, currentCount, verificationStatus === 'verified');
+      
+      const myFulfillments = requests.filter(r => r.fulfillerId === currentUser.id && (r.status === RequestStatus.FULFILLED || r.status === RequestStatus.RECEIVED));
+      const currentCount = myFulfillments.length + 1;
+      checkAndAwardBadges(currentUser, currentCount, verificationStatus === 'verified');
 
-    showToast('Purchase confirmed! The requester has been notified.');
+      showToast('Purchase confirmed! The requester has been notified.');
+    } catch (err) {
+      showToast('Failed to confirm purchase', 'error');
+    }
   };
 
-  const handleUpdateTracking = (requestId: string, trackingNumber: string) => {
+  const handleUpdateTracking = async (requestId: string, trackingNumber: string) => {
     const targetRequest = requests.find(r => r.id === requestId);
+    if (!targetRequest) return;
 
-    setRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        return { ...req, trackingNumber: trackingNumber };
-      }
-      return req;
-    }));
-    
-    setIsFulfillmentModalOpen(false);
-    setActiveRequest(null);
+    try {
+      const { error } = await supabase
+        .from('requests')
+        .update({ tracking_number: trackingNumber })
+        .eq('id', requestId);
 
-    if (targetRequest) {
+      if (error) throw error;
+
+      setIsFulfillmentModalOpen(false);
+      setActiveRequest(null);
+
       addNotification(
         targetRequest.requesterId,
         `Tracking update for "${targetRequest.title}": ${trackingNumber}`,
         requestId
       );
-    }
 
-    showToast('Tracking number updated successfully.');
+      showToast('Tracking number updated successfully.');
+    } catch (err) {
+      showToast('Failed to update tracking', 'error');
+    }
   };
 
   const handleMarkReceived = (request: RequestItem) => {
     setThankYouModalRequest(request);
   };
 
-  const submitThankYou = (message: string, forumPostData?: { title: string, content: string }) => {
+  const submitThankYou = async (message: string, forumPostData?: { title: string, content: string }) => {
     if (!thankYouModalRequest) return;
     
-    setRequests(prev => prev.map(req => {
-      if (req.id === thankYouModalRequest.id) {
-        return { ...req, status: RequestStatus.RECEIVED, thankYouMessage: message };
+    try {
+      const { error } = await supabase
+        .from('requests')
+        .update({ 
+          status: RequestStatus.RECEIVED, 
+          thank_you_message: message 
+        })
+        .eq('id', thankYouModalRequest.id);
+
+      if (error) throw error;
+
+      if (thankYouModalRequest.fulfillerId) {
+        addNotification(
+          thankYouModalRequest.fulfillerId,
+          `${currentUser.displayName} received the "${thankYouModalRequest.title}" and says: "${message}"`,
+          thankYouModalRequest.id
+        );
       }
-      return req;
-    }));
-    
-    if (thankYouModalRequest.fulfillerId) {
-      addNotification(
-        thankYouModalRequest.fulfillerId,
-        `${currentUser.displayName} received the "${thankYouModalRequest.title}" and says: "${message}"`,
-        thankYouModalRequest.id
-      );
-    }
 
-    // Auto-Post to Forum if requested
-    if (forumPostData) {
-        const thread: ForumThread = {
-          id: `th_${Date.now()}`,
-          authorId: currentUser.id,
-          title: forumPostData.title,
-          content: forumPostData.content,
-          category: ForumCategory.STORIES,
-          createdAt: new Date().toISOString(),
-          replies: [],
-          views: 0,
-          likes: []
-        };
-        setForumThreads(prev => [thread, ...prev]);
-        showToast('Shared as a success story on the forum!');
-    } else {
-        showToast('Item marked received!');
-    }
+      if (forumPostData) {
+          const thread: ForumThread = {
+            id: `th_${Date.now()}`,
+            authorId: currentUser.id,
+            title: forumPostData.title,
+            content: forumPostData.content,
+            category: ForumCategory.STORIES,
+            createdAt: new Date().toISOString(),
+            replies: [],
+            views: 0,
+            likes: []
+          };
+          setForumThreads(prev => [thread, ...prev]);
+          showToast('Shared as a success story on the forum!');
+      } else {
+          showToast('Item marked received!');
+      }
 
-    setThankYouModalRequest(null);
+      setThankYouModalRequest(null);
+    } catch (err) {
+      showToast('Failed to mark received', 'error');
+    }
   };
 
-  const handleAddComment = (requestId: string, text: string) => {
-      setRequests(prev => prev.map(r => {
-          if (r.id === requestId) {
-              return {
-                  ...r,
-                  comments: [...r.comments, { id: `c_${Date.now()}`, userId: currentUser.id, text, createdAt: new Date().toISOString() }]
-              };
-          }
-          return r;
-      }));
+  const handleAddComment = async (requestId: string, text: string) => {
+      const targetRequest = requests.find(r => r.id === requestId);
+      if (!targetRequest) return;
 
-      // Notify Request Owner if it's not them commenting
-      const req = requests.find(r => r.id === requestId);
-      if (req && req.requesterId !== currentUser.id) {
-          addNotification(
-            req.requesterId,
-            `${currentUser.displayName} commented on "${req.title}"`,
-            requestId
-          );
-      }
-      // Notify Fulfiller if exists and it's not them
-      if (req && req.fulfillerId && req.fulfillerId !== currentUser.id && req.requesterId !== currentUser.id) {
-          addNotification(
-              req.fulfillerId,
-              `${currentUser.displayName} commented on "${req.title}"`,
+      const newComment = { 
+        id: `c_${Date.now()}`, 
+        userId: currentUser.id, 
+        text, 
+        createdAt: new Date().toISOString() 
+      };
+      
+      const updatedComments = [...targetRequest.comments, newComment];
+
+      try {
+        const { error } = await supabase
+          .from('requests')
+          .update({ comments: updatedComments })
+          .eq('id', requestId);
+
+        if (error) throw error;
+
+        // Notifications logic remains local for now as we don't have a notifications table yet
+        if (targetRequest.requesterId !== currentUser.id) {
+            addNotification(
+              targetRequest.requesterId,
+              `${currentUser.displayName} commented on "${targetRequest.title}"`,
               requestId
-          );
+            );
+        }
+      } catch (err) {
+        showToast('Failed to post comment', 'error');
       }
   };
+
+  if (loading && requests.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+          <p className="text-slate-500 font-medium">Connecting to Community...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-12">
@@ -597,7 +620,7 @@ const App: React.FC = () => {
                     <RequestCard 
                       key={req.id} 
                       request={req} 
-                      requester={users[req.requesterId]}
+                      requester={users[req.requesterId] || MOCK_USERS['user_1']} 
                       onFulfill={handleOpenFulfillment}
                       onMarkReceived={handleMarkReceived}
                       onViewProfile={handleViewProfile}
@@ -606,14 +629,10 @@ const App: React.FC = () => {
                     />
                   ))}
                   
-                  {requests.filter(r => {
-                    const matchesSearch = r.title.toLowerCase().includes(searchTerm.toLowerCase()) || r.reason.toLowerCase().includes(searchTerm.toLowerCase());
-                    const matchesCategory = categoryFilter === 'All' || r.category === categoryFilter;
-                    return matchesSearch && matchesCategory;
-                  }).length === 0 && (
+                  {requests.length === 0 && !loading && (
                     <div className="col-span-full text-center py-12 text-slate-400">
                        <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                       <p>No requests found matching your filters.</p>
+                       <p>No active requests found. Be the first to ask!</p>
                     </div>
                   )}
               </div>
@@ -667,7 +686,6 @@ const App: React.FC = () => {
                onEditProfile={() => setIsEditProfileOpen(true)}
              />
 
-             {/* Profile Tabs */}
              <div className="flex border-b border-slate-200 mb-6">
                 <button 
                   onClick={() => setProfileTab('requests')}
@@ -690,7 +708,7 @@ const App: React.FC = () => {
                     <RequestCard 
                       key={req.id} 
                       request={req} 
-                      requester={users[req.requesterId]}
+                      requester={users[req.requesterId] || MOCK_USERS['user_1']}
                       onFulfill={handleOpenFulfillment}
                       onMarkReceived={handleMarkReceived}
                       onViewProfile={handleViewProfile}
@@ -698,12 +716,6 @@ const App: React.FC = () => {
                       currentUser={currentUser}
                     />
                   ))}
-                  
-                 {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).length === 0 && (
-                    <div className="col-span-full text-center py-12 text-slate-400">
-                       <p>No items found.</p>
-                    </div>
-                 )}
              </div>
            </div>
         )}
