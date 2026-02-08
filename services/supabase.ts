@@ -5,8 +5,10 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'placeholder-key';
 
-if (supabaseUrl === 'https://placeholder.supabase.co') {
-  console.warn("Supabase keys are missing or invalid. Please check your .env file.");
+export const isSupabaseConfigured = supabaseUrl !== 'https://placeholder.supabase.co' && supabaseAnonKey !== 'placeholder-key';
+
+if (!isSupabaseConfigured) {
+  console.warn("Supabase keys are missing or invalid. Please check your .env file or Netlify environment variables.");
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -30,6 +32,8 @@ export const base64ToFile = (base64: string, filename: string): File => {
  * Uploads a file to the 'images' bucket and returns the public URL.
  */
 export const uploadImage = async (file: File): Promise<string | null> => {
+  if (!isSupabaseConfigured) return null;
+  
   try {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;

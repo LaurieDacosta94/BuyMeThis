@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { Button } from './Button';
-import { Gift, Mail, Lock, User, MapPin, AtSign, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Gift, Mail, Lock, User, MapPin, AtSign, Loader2, AlertCircle, ArrowRight, Database } from 'lucide-react';
 
 interface AuthProps {
   onLoginSuccess: () => void;
@@ -97,6 +97,62 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess, session }) => {
       setLoading(false);
     }
   };
+
+  // --- DATABASE SETUP MODE ---
+  // If Supabase is not configured, show instructions instead of login
+  if (!isSupabaseConfigured) {
+    return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+            <div className="bg-white max-w-xl w-full rounded-2xl p-8 shadow-2xl">
+                <div className="text-center mb-6">
+                    <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-amber-50">
+                        <Database className="h-8 w-8 text-amber-600" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Connect Your Database</h1>
+                    <p className="text-slate-600">
+                        The app is running, but it's not connected to Supabase yet.
+                    </p>
+                </div>
+
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-sm space-y-4 mb-6">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <span className="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">1</span>
+                        Get Credentials
+                    </h3>
+                    <p className="text-slate-600 pl-7">
+                        Create a project at <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline font-medium">supabase.com</a>. Go to <strong>Project Settings &gt; API</strong> and copy your <code>Project URL</code> and <code>anon public key</code>.
+                    </p>
+
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <span className="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">2</span>
+                        Configure Environment
+                    </h3>
+                    <div className="pl-7 text-slate-600">
+                        <p className="mb-2">Add these to your Netlify Site Settings (or <code>.env</code> file locally):</p>
+                        <ul className="bg-slate-900 text-slate-300 p-3 rounded-md font-mono text-xs space-y-1">
+                            <li>SUPABASE_URL=https://your-project.supabase.co</li>
+                            <li>SUPABASE_ANON_KEY=your-anon-key</li>
+                        </ul>
+                    </div>
+
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <span className="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">3</span>
+                        Setup Tables
+                    </h3>
+                    <p className="text-slate-600 pl-7">
+                        Copy the contents of the <code>db_setup.sql</code> file in your source code and run it in the Supabase <strong>SQL Editor</strong> to create the necessary tables.
+                    </p>
+                </div>
+                
+                <div className="flex justify-center">
+                    <Button onClick={() => window.location.reload()}>
+                        I've Updated the Settings
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+  }
 
   const isProfileMode = mode === 'signup' || mode === 'complete_profile';
 
