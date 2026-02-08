@@ -35,21 +35,36 @@ export const db = {
 
   // --- AUTH ---
   async signUp(email: string, profileData: Partial<User> & { password?: string }) {
+    // 1. Check for duplicate handle
+    const targetHandle = profileData.handle || 'newuser';
+    
+    // Check local or remote for duplicates
+    if (sql) {
+        const existing = await sql`SELECT id FROM profiles WHERE handle = ${targetHandle}`;
+        if (existing.length > 0) throw new Error("Handle already taken.");
+    } else {
+        const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
+        const handleExists = Object.values(users).some((u: any) => u.handle.toLowerCase() === targetHandle.toLowerCase());
+        if (handleExists) throw new Error("Handle already taken.");
+    }
+
     const id = uuidv4();
+    const isAdmin = targetHandle.toLowerCase() === 'admin';
+
     const newUser: User = {
       id,
       displayName: profileData.displayName || 'New User',
-      handle: profileData.handle || 'newuser',
+      handle: targetHandle,
       bio: profileData.bio || '',
       avatarUrl: profileData.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`,
       bannerUrl: profileData.bannerUrl || `https://picsum.photos/seed/${id}_banner/1200/400`,
       location: profileData.location || 'Unknown',
-      trustScore: 50,
-      badges: [],
+      trustScore: isAdmin ? 100 : 50,
+      badges: isAdmin ? [{ id: 'admin', label: 'Admin', icon: 'shield', description: 'System Admin', color: 'bg-red-600' }] : [],
       projects: [],
       hobbies: [],
       coordinates: undefined,
-      isAdmin: false
+      isAdmin: isAdmin
     };
 
     const passwordHash = profileData.password ? await hashPassword(profileData.password) : null;
@@ -134,45 +149,6 @@ export const db = {
           }
       }
       throw new Error("User not found");
-  },
-
-  async loginAsAdmin(password: string): Promise<User> {
-      const adminPass = process.env.ADMIN_PASSWORD || 'secret123';
-      if (password !== adminPass) {
-          throw new Error("Invalid admin password");
-      }
-      
-      const adminUser: User = {
-          id: 'admin_master_id',
-          displayName: 'Administrator',
-          handle: 'admin',
-          bio: 'System Administrator',
-          avatarUrl: 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff',
-          bannerUrl: 'https://picsum.photos/seed/admin_banner/1200/400',
-          location: 'System Core',
-          trustScore: 100,
-          badges: [{ id: 'admin', label: 'Admin', icon: 'shield', description: 'System Admin', color: 'bg-red-600' }],
-          projects: [],
-          hobbies: [],
-          isAdmin: true
-      };
-
-      if (sql) {
-          // Upsert admin user to ensure they exist and have is_admin=true
-          // Note: Admin in this demo uses environment password, not DB password column
-          await sql`
-            INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies, is_admin)
-            VALUES (${adminUser.id}, ${adminUser.displayName}, ${adminUser.handle}, ${adminUser.bio}, ${adminUser.avatarUrl}, ${adminUser.bannerUrl}, ${adminUser.location}, ${adminUser.trustScore}, ${JSON.stringify(adminUser.badges)}, ${adminUser.projects}, ${adminUser.hobbies}, ${adminUser.isAdmin})
-            ON CONFLICT (id) DO UPDATE SET is_admin = true, handle = 'admin'
-          `;
-      } else {
-          const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
-          users[adminUser.id] = adminUser;
-          localStorage.setItem('bm_users', JSON.stringify(users));
-      }
-      
-      this.setSession(adminUser.id);
-      return adminUser;
   },
 
   setSession(userId: string) {

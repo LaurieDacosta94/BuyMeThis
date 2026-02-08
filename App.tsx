@@ -487,6 +487,7 @@ const App: React.FC = () => {
   const handleViewProfile = (userId: string) => {
     setViewingProfileId(userId);
     setCurrentView('profile');
+    if (detailsRequest) setDetailsRequest(null); // Close modal if open
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -549,6 +550,10 @@ const App: React.FC = () => {
             onLogin={() => setShowAuthModal(true)}
             notifications={notifications}
             onMarkNotificationsRead={handleMarkNotificationsRead}
+            onOpenRequest={(id) => {
+                const req = requests.find(r => r.id === id);
+                if (req) handleOpenDetails(req);
+            }}
           />
       )}
 
@@ -699,7 +704,21 @@ const App: React.FC = () => {
       </div>
 
       {activeRequest && currentUser && <FulfillmentModal isOpen={isFulfillmentModalOpen} onClose={() => { setIsFulfillmentModalOpen(false); setActiveRequest(null); }} request={activeRequest} currentUser={currentUser} onCommit={handleCommit} onConfirmPurchase={handleConfirmPurchase} onUpdateTracking={handleUpdateTracking} />}
-      {detailsRequest && <RequestDetailsModal isOpen={!!detailsRequest} onClose={() => setDetailsRequest(null)} request={detailsRequest} requester={users[detailsRequest.requesterId]} usersMap={users} onFulfill={() => handleOpenFulfillment(detailsRequest)} currentUser={currentUser} candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} onDelete={handleDeleteRequest} onAddComment={handleAddComment} />}
+      {detailsRequest && (
+        <RequestDetailsModal 
+            isOpen={!!detailsRequest} 
+            onClose={() => setDetailsRequest(null)} 
+            request={detailsRequest} 
+            requester={users[detailsRequest.requesterId]} 
+            usersMap={users} 
+            onFulfill={() => handleOpenFulfillment(detailsRequest)} 
+            currentUser={currentUser} 
+            candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} 
+            onDelete={handleDeleteRequest} 
+            onAddComment={handleAddComment}
+            onViewProfile={handleViewProfile}
+        />
+      )}
       {thankYouModalRequest && <ThankYouModal isOpen={!!thankYouModalRequest} onClose={() => setThankYouModalRequest(null)} itemTitle={thankYouModalRequest.title} originalReason={thankYouModalRequest.reason} donorName={users[thankYouModalRequest.fulfillerId || '']?.displayName} onSubmit={submitThankYou} />}
       {currentUser && <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} user={currentUser} onSave={handleUpdateUser} />}
       

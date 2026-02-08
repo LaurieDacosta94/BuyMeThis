@@ -19,10 +19,11 @@ interface RequestDetailsModalProps {
   candidates: User[];
   onAddComment?: (requestId: string, text: string) => void;
   onDelete?: (request: RequestItem) => void;
+  onViewProfile?: (userId: string) => void;
 }
 
 export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({ 
-  request, requester, usersMap, isOpen, onClose, onFulfill, currentUser, candidates, onAddComment, onDelete
+  request, requester, usersMap, isOpen, onClose, onFulfill, currentUser, candidates, onAddComment, onDelete, onViewProfile
 }) => {
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
@@ -160,7 +161,10 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
             <div className="p-6">
                 {/* User Info */}
                 <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
+                    <div 
+                        className="flex items-center gap-3 cursor-pointer hover:bg-slate-100 p-2 rounded-xl transition-colors -ml-2"
+                        onClick={() => onViewProfile && onViewProfile(requester.id)}
+                    >
                         <img src={requester.avatarUrl} className="w-12 h-12 rounded-full border-2 border-white shadow-md" alt="" />
                         <div>
                             <div className="font-bold text-slate-800 text-lg">{requester.displayName}</div>
@@ -205,7 +209,11 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                         </h4>
                         <div className="flex flex-wrap gap-2">
                             {candidates.map(c => (
-                                <div key={c.id} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-blue-100 shadow-sm">
+                                <div 
+                                    key={c.id} 
+                                    className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-blue-100 shadow-sm cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all"
+                                    onClick={() => onViewProfile && onViewProfile(c.id)}
+                                >
                                     <img src={c.avatarUrl} className="w-5 h-5 rounded-full" alt="" />
                                     <span className="text-xs font-bold text-slate-700">{c.displayName}</span>
                                 </div>
@@ -227,12 +235,20 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                                 const name = commenter ? commenter.displayName : 'Unknown';
                                 return (
                                   <div key={comment.id} className="flex gap-3">
-                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${comment.userId === requester.id ? 'bg-cyan-100 text-cyan-600' : 'bg-slate-100 text-slate-500'}`}>
+                                      <div 
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 cursor-pointer ${comment.userId === requester.id ? 'bg-cyan-100 text-cyan-600' : 'bg-slate-100 text-slate-500'}`}
+                                        onClick={() => onViewProfile && onViewProfile(comment.userId)}
+                                      >
                                           <span className="text-xs font-bold">{comment.userId === requester.id ? 'OP' : name.charAt(0)}</span>
                                       </div>
                                       <div className="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
                                           <div className="flex justify-between items-center mb-1">
-                                            <span className="font-bold text-xs text-slate-800">{comment.userId === requester.id ? 'Original Poster' : name}</span>
+                                            <span 
+                                                className="font-bold text-xs text-slate-800 cursor-pointer hover:underline"
+                                                onClick={() => onViewProfile && onViewProfile(comment.userId)}
+                                            >
+                                                {comment.userId === requester.id ? 'Original Poster' : name}
+                                            </span>
                                             <span className="text-[10px] text-slate-400">{timeAgo(comment.createdAt)}</span>
                                           </div>
                                           <p className="text-sm text-slate-700">{comment.text}</p>

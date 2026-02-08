@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Gift, Plus, Globe, Bell, ChevronDown, User as UserIcon, LogOut, Trophy, MessageSquare, LogIn, Menu, X, Shield, Search } from 'lucide-react';
 import { User, Notification } from '../types';
@@ -12,6 +13,7 @@ interface NavbarProps {
   onLogin: () => void;
   notifications: Notification[];
   onMarkNotificationsRead: () => void;
+  onOpenRequest: (requestId: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ 
@@ -23,7 +25,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onLogin,
   notifications,
-  onMarkNotificationsRead
+  onMarkNotificationsRead,
+  onOpenRequest
 }) => {
   const [activeMenu, setActiveMenu] = useState<'none' | 'notifications' | 'user' | 'mobile'>('none');
   const navRef = useRef<HTMLDivElement>(null);
@@ -120,7 +123,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <div className="max-h-80 overflow-y-auto custom-scrollbar p-2">
                                 {notifications.length > 0 ? (
                                 notifications.map((n) => (
-                                    <div key={n.id} className={`p-3 mb-1 rounded-xl hover:bg-cyan-50 transition-colors ${!n.isRead ? 'bg-blue-50/50 border border-blue-100' : ''}`}>
+                                    <div 
+                                        key={n.id} 
+                                        onClick={() => {
+                                            if (n.relatedRequestId) {
+                                                onOpenRequest(n.relatedRequestId);
+                                                setActiveMenu('none');
+                                            }
+                                        }}
+                                        className={`p-3 mb-1 rounded-xl hover:bg-cyan-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/50 border border-blue-100' : ''}`}
+                                    >
                                         <div className="flex gap-3">
                                             <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${n.type === 'success' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : n.type === 'alert' ? 'bg-pink-500' : 'bg-cyan-400'}`} />
                                             <div>

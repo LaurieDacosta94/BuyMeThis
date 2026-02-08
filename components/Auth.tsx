@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { db } from '../services/db';
 import { Button } from './Button';
@@ -19,18 +20,11 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   const [handle, setHandle] = useState('');
   const [location, setLocation] = useState('');
 
-  const isAdminAttempt = email.toLowerCase() === 'admin' || handle.toLowerCase() === 'admin';
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      if (isAdminAttempt) { 
-          await db.loginAsAdmin(password); 
-          onLoginSuccess(); 
-          return; 
-      }
       if (mode === 'signup') {
         if (!password) throw new Error("Password is required");
         await db.signUp(email, { displayName, handle: handle.replace('@', ''), location, bio: "Ready.", password });
@@ -62,10 +56,10 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
            <form onSubmit={handleAuth} className="space-y-4">
               {mode === 'signup' && (
                   <div className="space-y-3">
-                    <input type="text" placeholder="Display Name" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required={!isAdminAttempt && mode === 'signup'} />
+                    <input type="text" placeholder="Display Name" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required={mode === 'signup'} />
                     <div className="flex gap-3">
-                        <input type="text" placeholder="Handle" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm" value={handle} onChange={(e) => setHandle(e.target.value)} required={!isAdminAttempt && mode === 'signup'} />
-                        <input type="text" placeholder="City" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm" value={location} onChange={(e) => setLocation(e.target.value)} required={!isAdminAttempt && mode === 'signup'} />
+                        <input type="text" placeholder="Handle" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm" value={handle} onChange={(e) => setHandle(e.target.value)} required={mode === 'signup'} />
+                        <input type="text" placeholder="City" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-600 outline-none text-sm" value={location} onChange={(e) => setLocation(e.target.value)} required={mode === 'signup'} />
                     </div>
                   </div>
               )}
