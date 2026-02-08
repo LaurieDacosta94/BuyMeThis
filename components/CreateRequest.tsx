@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Button } from './Button';
 import { enrichRequestData, validateContent, analyzeImageForRequest, analyzeAudioForRequest, generateRequestImage, getApproximateAddress } from '../services/geminiService';
 import { RequestItem, RequestStatus, User, Coordinates, Category, DeliveryPreference } from '../types';
-import { Sparkles, Link as LinkIcon, AlertCircle, Crosshair, ShieldAlert, Camera, Upload, X, Mic, Square, Wand2, Truck, Handshake, Globe } from 'lucide-react';
+import { Sparkles, Link as LinkIcon, Camera, Mic, Wand2, Crosshair, ArrowRight, ArrowLeft, Image as ImageIcon, MapPin } from 'lucide-react';
 
 interface CreateRequestProps {
   currentUser: User;
@@ -90,7 +90,7 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
       try {
           const base64 = await generateRequestImage(formData.title, formData.category);
           if (base64) setUploadedImage(base64);
-      } catch (err) { setError("Gen failed."); } finally { setIsGeneratingImage(false); }
+      } catch (err) { setError("Generation failed."); } finally { setIsGeneratingImage(false); }
   };
 
   const handleEnrichment = async () => {
@@ -99,7 +99,7 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
     setError(null);
     try {
       const safetyCheck = await validateContent(formData.title + " " + formData.reason);
-      if (!safetyCheck.safe) throw new Error("Safety check failed.");
+      if (!safetyCheck.safe) throw new Error("Safety check failed: Content flagged.");
 
       let enriched = { title: formData.title, price: 0, description: "", category: formData.category };
       if (formData.productUrl) {
@@ -151,54 +151,52 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
   };
 
   return (
-    <div className="max-w-2xl mx-auto bg-white border border-slate-200 shadow-sm">
-      <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-        <h2 className="text-lg font-bold text-slate-900 uppercase tracking-wide">New Request Protocol</h2>
+    <div className="max-w-2xl mx-auto bg-white/90 backdrop-blur-md rounded-3xl border border-white/60 shadow-glow overflow-hidden">
+      <div className="bg-gradient-to-r from-cyan-500 to-blue-500 px-8 py-6 text-white">
+        <h2 className="text-2xl font-black tracking-tight">{step === 1 ? 'New Request Protocol' : 'Finalize Request'}</h2>
+        <p className="text-cyan-100 text-sm font-medium">Step {step} of 2</p>
       </div>
 
-      <div className="p-6">
+      <div className="p-8">
         {step === 1 && (
           <div className="space-y-6">
-            <div className="bg-slate-50 p-4 border border-slate-200">
-                <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-bold text-blue-700 text-sm uppercase flex items-center gap-2"><Sparkles className="h-4 w-4" /> AI Auto-Fill</h3>
+            
+            {/* AI Assistant Section */}
+            <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-bold text-indigo-900 text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-indigo-500" /> AI Auto-Fill</h3>
                     <div className="flex gap-2">
                          {isRecording ? (
-                            <button onClick={stopRecording} className="bg-red-600 text-white px-3 py-1 text-xs font-bold uppercase animate-pulse">Stop</button>
+                            <button onClick={stopRecording} className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold animate-pulse">Recording...</button>
                          ) : (
-                            <button onClick={startRecording} disabled={isAnalyzingImage} className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1 text-xs font-bold uppercase"><Mic className="h-3 w-3 inline mr-1" /> Voice</button>
+                            <button onClick={startRecording} disabled={isAnalyzingImage} className="bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 transition-colors"><Mic className="h-3 w-3" /> Voice</button>
                          )}
-                         <label className="cursor-pointer bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1 text-xs font-bold uppercase flex items-center gap-1">
+                         <label className="cursor-pointer bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 transition-colors">
                             <Camera className="h-3 w-3" /> Image
                             <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isRecording} />
                         </label>
                     </div>
                 </div>
-                {(isAnalyzingImage || isGeneratingImage) && <div className="text-xs font-mono text-blue-600">Processing media stream...</div>}
-                {uploadedImage && <img src={uploadedImage} alt="Uploaded" className="h-16 w-16 object-cover border border-slate-300 mt-2" />}
+                {(isAnalyzingImage || isGeneratingImage) && <div className="text-xs font-bold text-indigo-600 animate-pulse">Processing media stream...</div>}
+                {uploadedImage && <img src={uploadedImage} alt="Uploaded" className="h-20 w-20 object-cover rounded-xl border border-indigo-200 shadow-sm mt-2" />}
             </div>
 
-            <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">External Link</label>
-                  <input type="url" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none text-sm font-mono" placeholder="https://" value={formData.productUrl} onChange={(e) => setFormData({...formData, productUrl: e.target.value})} />
-                </div>
-
+            <div className="space-y-5">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Item Title</label>
-                  <input type="text" className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none text-sm font-bold" placeholder="Item Name" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
+                  <input type="text" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none text-sm font-bold bg-slate-50 focus:bg-white transition-all" placeholder="What do you need?" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Category</label>
-                        <select className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none text-sm bg-white" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as Category})}>
+                        <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 outline-none text-sm bg-slate-50 focus:bg-white transition-all cursor-pointer" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as Category})}>
                             {Object.values(Category).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Logistics</label>
-                        <select className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none text-sm bg-white" value={formData.deliveryPreference} onChange={(e) => setFormData({...formData, deliveryPreference: e.target.value as DeliveryPreference})}>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Delivery</label>
+                        <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 outline-none text-sm bg-slate-50 focus:bg-white transition-all cursor-pointer" value={formData.deliveryPreference} onChange={(e) => setFormData({...formData, deliveryPreference: e.target.value as DeliveryPreference})}>
                             <option value={DeliveryPreference.ANY}>Any Method</option>
                             <option value={DeliveryPreference.SHIPPING}>Shipping</option>
                             <option value={DeliveryPreference.IN_PERSON}>In Person</option>
@@ -207,52 +205,66 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
                 </div>
 
                 <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Link (Optional)</label>
+                  <div className="relative">
+                      <LinkIcon className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                      <input type="url" className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none text-sm bg-slate-50 focus:bg-white transition-all" placeholder="https://amazon.com/..." value={formData.productUrl} onChange={(e) => setFormData({...formData, productUrl: e.target.value})} />
+                  </div>
+                </div>
+
+                <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Reason / Context</label>
-                  <textarea className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none h-32 text-sm" placeholder="Explanation required." value={formData.reason} onChange={(e) => setFormData({...formData, reason: e.target.value})} />
+                  <textarea className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none h-32 text-sm bg-slate-50 focus:bg-white transition-all" placeholder="Why do you need this item? Tell your story..." value={formData.reason} onChange={(e) => setFormData({...formData, reason: e.target.value})} />
                 </div>
                 
                 {!uploadedImage && formData.title && (
-                    <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="text-xs text-blue-600 font-bold uppercase hover:underline flex items-center gap-1">
-                        <Wand2 className="h-3 w-3" /> Generate Visualization
+                    <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="text-xs text-indigo-600 font-bold hover:text-indigo-800 flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-indigo-50 w-fit">
+                        <Wand2 className="h-3 w-3" /> Generate Visualization with AI
                     </button>
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Geo-Tag</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Your Location</label>
                   <div className="flex gap-2">
-                      <div className="flex-1 px-3 py-2 border border-slate-200 bg-slate-50 text-sm font-mono truncate">{locationName}</div>
-                      <Button variant="outline" onClick={handleDetectLocation} isLoading={isLocating}><Crosshair className="h-4 w-4" /></Button>
+                      <div className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-slate-400" />
+                          {locationName}
+                      </div>
+                      <Button variant="outline" onClick={handleDetectLocation} isLoading={isLocating} className="rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50"><Crosshair className="h-4 w-4" /></Button>
                   </div>
                 </div>
 
-                {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-2 border border-red-200 flex items-center gap-2"><ShieldAlert className="h-4 w-4" /> {error}</div>}
+                {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-3 rounded-xl border border-red-100">{error}</div>}
 
                 <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="ghost" onClick={onCancel} className="uppercase">Cancel</Button>
-                  <Button onClick={handleEnrichment} isLoading={isLoading} className="uppercase">Next Step <Sparkles className="ml-2 h-3 w-3" /></Button>
+                  <Button variant="ghost" onClick={onCancel} className="rounded-xl">Cancel</Button>
+                  <Button onClick={handleEnrichment} isLoading={isLoading} className="rounded-xl shadow-lg shadow-cyan-500/25">Continue <ArrowRight className="ml-2 h-4 w-4" /></Button>
                 </div>
             </div>
           </div>
         )}
 
         {step === 2 && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="bg-slate-50 p-4 border border-slate-200 flex gap-4">
-               <img src={uploadedImage || `https://picsum.photos/100`} className="w-16 h-16 object-cover border border-slate-300" alt="Preview" />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex gap-4 items-center">
+               <img src={uploadedImage || `https://picsum.photos/100`} className="w-16 h-16 object-cover rounded-xl shadow-sm" alt="Preview" />
                <div>
                  <h3 className="font-bold text-slate-900">{formData.title}</h3>
-                 <div className="text-xs text-slate-500 mt-1 uppercase font-bold">{formData.category} • {formData.deliveryPreference}</div>
+                 <div className="text-xs text-slate-500 mt-1 font-medium">{formData.category} • {formData.deliveryPreference}</div>
                </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Secure Delivery Data</label>
-              <textarea className="w-full px-4 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none h-24 font-mono text-sm" placeholder="Address or Meetup Coordinates" value={formData.shippingAddress} onChange={(e) => setFormData({...formData, shippingAddress: e.target.value})} required />
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Private Shipping Info</label>
+              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-xs text-yellow-800 mb-2">
+                  This info is encrypted and only shared with the person who fulfills your request.
+              </div>
+              <textarea className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none h-24 text-sm bg-slate-50 focus:bg-white transition-all" placeholder="Full Address or preferred meetup spot..." value={formData.shippingAddress} onChange={(e) => setFormData({...formData, shippingAddress: e.target.value})} required />
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button variant="ghost" type="button" onClick={() => setStep(1)} className="uppercase">Back</Button>
-              <Button type="submit" variant="primary" className="uppercase">Initialize Request</Button>
+              <Button variant="ghost" type="button" onClick={() => setStep(1)} className="rounded-xl"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+              <Button type="submit" variant="primary" className="rounded-xl shadow-lg shadow-cyan-500/25">Post Request</Button>
             </div>
           </form>
         )}

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User, DeliveryPreference } from '../types';
 import { Button } from './Button';
-import { X, MapPin, Clock, MessageCircle, Send, Heart, Users, CheckCircle, Navigation, ShieldCheck, Truck, Handshake, Globe, AlertTriangle, Loader2, StopCircle, Mic, Volume2, Trash2, Terminal } from 'lucide-react';
+import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play } from 'lucide-react';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
 import { playPcmAudio } from '../utils/audio';
@@ -24,7 +24,6 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
 }) => {
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
-  const [commentError, setCommentError] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [audioSource, setAudioSource] = useState<AudioBufferSourceNode | null>(null);
@@ -39,9 +38,9 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours < 1) return '00:00:00';
-    if (hours < 24) return `${hours}H`;
-    return `${Math.floor(hours / 24)}D`;
+    if (hours < 1) return 'Just now';
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
   };
 
   const distanceInfo = currentUser?.coordinates && request.coordinates ? formatDistance(calculateDistance(
@@ -58,19 +57,16 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
     if (!currentUser) return;
     if (newComment.trim() && onAddComment) {
       setIsPostingComment(true);
-      setCommentError(null);
       try {
         const safety = await validateContent(newComment);
         if (!safety.safe) {
-            setCommentError(safety.reason || "Flagged.");
+            alert("Comment flagged as unsafe.");
             setIsPostingComment(false);
             return;
         }
         onAddComment(request.id, newComment);
         setNewComment('');
-      } catch (err) {
-          setCommentError("Failed.");
-      } finally { setIsPostingComment(false); }
+      } catch (err) { console.error(err); } finally { setIsPostingComment(false); }
     }
   };
 
@@ -114,108 +110,97 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                      if (text) setNewComment(prev => prev + (prev ? ' ' : '') + text);
                      setIsPostingComment(false);
                  };
-            } catch (err) { setCommentError("Error."); setIsPostingComment(false); }
+            } catch (err) { setIsPostingComment(false); }
         };
         mediaRecorderRef.current.start();
         setIsRecordingComment(true);
-    } catch (err) { setCommentError("Mic blocked."); }
+    } catch (err) { alert("Mic blocked."); }
   };
 
   const stopRecording = () => { if (mediaRecorderRef.current && isRecordingComment) { mediaRecorderRef.current.stop(); setIsRecordingComment(false); } };
-  const handleDelete = () => { if (confirm("Delete?") && onDelete) { onDelete(request); onClose(); } };
+  const handleDelete = () => { if (confirm("Are you sure you want to delete this request?")) { onDelete && onDelete(request); onClose(); } };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
       
-      <div className="relative bg-white w-full max-w-2xl border-2 border-slate-900 shadow-hard flex flex-col max-h-[90vh]">
+      <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
         
-        {/* System Bar */}
-        <div className="bg-slate-900 text-white px-3 py-2 flex justify-between items-center select-none border-b-2 border-slate-900 shrink-0">
-           <div className="flex items-center gap-2">
-             <div className="flex gap-1">
-                <div className="w-3 h-3 bg-red-500 border border-black"></div>
-                <div className="w-3 h-3 bg-yellow-400 border border-black"></div>
-             </div>
-             <span className="font-mono text-xs font-bold uppercase tracking-widest text-slate-300">DATA_VIEWER // {request.id.slice(-6)}</span>
-           </div>
-           <button onClick={onClose} className="hover:text-red-400 transition-colors"><X className="h-4 w-4"/></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div className="relative h-48 bg-slate-200 border-b-2 border-slate-900">
-                <img 
+        {/* Hero Header */}
+        <div className="relative h-56 shrink-0">
+             <div className="absolute inset-0 bg-slate-900/30 z-10"></div>
+             <img 
                 src={request.enrichedData?.imageUrl || `https://picsum.photos/seed/${request.id}/800/400`} 
                 alt={request.title} 
                 className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80"></div>
-                
-                <div className="absolute bottom-4 left-4 right-4 text-white">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap font-mono text-[10px] uppercase">
-                        <span className="bg-blue-600 px-2 py-0.5 border border-white/20">{request.category}</span>
-                        <span className="bg-slate-800 px-2 py-0.5 border border-white/20 flex items-center gap-1">
-                            {request.deliveryPreference === DeliveryPreference.SHIPPING ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
-                            {request.deliveryPreference || 'ANY'}
-                        </span>
-                        {distanceInfo && <span className="bg-slate-800 px-2 py-0.5 border border-white/20 flex items-center gap-1"><Navigation className="h-3 w-3" /> {distanceInfo}</span>}
-                    </div>
-                    <h2 className="text-2xl font-black uppercase tracking-tight">{request.title}</h2>
-                </div>
-            </div>
+            />
+            
+            <button onClick={onClose} className="absolute top-4 right-4 z-20 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-md transition-colors"><X className="w-5 h-5"/></button>
 
+            <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-900/90 to-transparent pt-20">
+                <div className="flex flex-wrap gap-2 mb-2">
+                    <span className="bg-cyan-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-sm uppercase">{request.category}</span>
+                    <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/20 flex items-center gap-1">
+                        {request.deliveryPreference === DeliveryPreference.SHIPPING ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
+                        {request.deliveryPreference || 'Any'}
+                    </span>
+                    {distanceInfo && <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/20 flex items-center gap-1"><Navigation className="h-3 w-3" /> {distanceInfo}</span>}
+                </div>
+                <h1 className="text-3xl font-black text-white leading-tight">{request.title}</h1>
+            </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50">
             <div className="p-6">
-                <div className="flex items-start justify-between mb-6 pb-4 border-b-2 border-slate-100 border-dashed">
+                {/* User Info */}
+                <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <img src={requester.avatarUrl} className="w-12 h-12 border-2 border-slate-900 bg-white" alt="" />
+                        <img src={requester.avatarUrl} className="w-12 h-12 rounded-full border-2 border-white shadow-md" alt="" />
                         <div>
-                            <p className="font-bold text-base text-slate-900 uppercase">{requester.displayName}</p>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
-                                <span>ID: {requester.handle}</span>
-                                <span>//</span>
+                            <div className="font-bold text-slate-800 text-lg">{requester.displayName}</div>
+                            <div className="text-xs text-slate-500 flex items-center gap-2">
+                                <span>@{requester.handle}</span>
+                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
                                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {requester.location}</span>
                             </div>
                         </div>
                     </div>
-                    <div className="text-right font-mono text-xs text-slate-400">
+                    <div className="text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-200">
                         {timeAgo(request.createdAt)}
                     </div>
                 </div>
 
-                <div className="mb-6">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 font-mono">Mission_Objective</h3>
-                    <p className="text-slate-800 leading-relaxed text-sm font-medium border-l-4 border-blue-500 pl-4 bg-slate-50 py-2">
-                        {request.reason}
-                    </p>
+                {/* Content */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm mb-6 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-cyan-400 to-blue-500"></div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">The Request</h3>
+                    <p className="text-slate-700 leading-relaxed text-sm">{request.reason}</p>
+                    
+                    <button 
+                        onClick={handlePlayAudio}
+                        className="mt-4 flex items-center gap-2 text-xs font-bold text-cyan-600 hover:bg-cyan-50 px-3 py-2 rounded-lg transition-colors w-fit"
+                    >
+                        {isLoadingAudio ? <Loader2 className="w-4 h-4 animate-spin" /> : isPlayingAudio ? <StopCircle className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                        {isLoadingAudio ? 'Loading Audio...' : isPlayingAudio ? 'Stop Reading' : 'Listen to Request'}
+                    </button>
                 </div>
 
                 {request.productUrl && (
-                    <div className="mb-6 border border-slate-300 p-2 bg-slate-50">
-                        <div className="text-[10px] text-slate-400 uppercase font-mono mb-1">External_Resource</div>
+                    <div className="mb-6">
                         <LinkPreview url={request.productUrl} />
                     </div>
                 )}
 
-                <div className="mb-6">
-                    <button 
-                        onClick={handlePlayAudio}
-                        className={`w-full text-xs font-bold flex items-center justify-center gap-2 px-4 py-3 border-2 transition-all font-mono uppercase ${isPlayingAudio ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-900 border-slate-900 hover:bg-slate-50'}`}
-                        disabled={isLoadingAudio}
-                    >
-                        {isLoadingAudio ? <Loader2 className="h-4 w-4 animate-spin" /> : isPlayingAudio ? <StopCircle className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                        {isLoadingAudio ? 'BUFFERING_AUDIO...' : isPlayingAudio ? 'STOP_PLAYBACK' : 'INITIATE_TTS_PLAYBACK'}
-                    </button>
-                </div>
-
+                {/* Candidates */}
                 {candidates.length > 0 && (
-                    <div className="bg-blue-50 p-4 mb-6 border border-blue-200">
-                        <h4 className="font-bold text-blue-900 mb-3 flex items-center gap-2 text-xs uppercase font-mono">
-                            <Users className="h-4 w-4" /> Active_Units ({candidates.length})
+                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mb-6">
+                        <h4 className="font-bold text-blue-900 mb-3 flex items-center gap-2 text-xs uppercase">
+                            <Users className="h-4 w-4 text-blue-500" /> Active Offers ({candidates.length})
                         </h4>
                         <div className="flex flex-wrap gap-2">
                             {candidates.map(c => (
-                                <div key={c.id} className="flex items-center gap-2 bg-white px-2 py-1 border border-blue-200 shadow-sm">
-                                    <img src={c.avatarUrl} className="w-6 h-6 border border-slate-200" alt="" />
+                                <div key={c.id} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-blue-100 shadow-sm">
+                                    <img src={c.avatarUrl} className="w-5 h-5 rounded-full" alt="" />
                                     <span className="text-xs font-bold text-slate-700">{c.displayName}</span>
                                 </div>
                             ))}
@@ -223,76 +208,74 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                     </div>
                 )}
 
-                <div className="border-t-2 border-slate-900 pt-6">
-                    <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2 text-xs uppercase font-mono">
-                        <Terminal className="h-4 w-4" /> Comm_Logs ({request.comments.length})
+                {/* Comments */}
+                <div className="mt-8">
+                    <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2 text-sm">
+                        Comments <span className="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-full">{request.comments.length}</span>
                     </h4>
                     
-                    <div className="space-y-3 mb-4">
+                    <div className="space-y-4 mb-6">
                         {request.comments.length > 0 ? (
                             request.comments.map(comment => (
-                                <div key={comment.id} className="flex gap-3 items-start bg-slate-50 p-3 border border-slate-200">
-                                    <div className={`w-1 self-stretch ${comment.userId === requester.id ? 'bg-blue-600' : 'bg-slate-400'}`}></div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className={`text-[10px] font-bold font-mono uppercase ${comment.userId === requester.id ? 'text-blue-700' : 'text-slate-700'}`}>
-                                                {comment.userId === requester.id ? 'OP_COMMAND' : 'UNIT_ID'}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 font-mono">{timeAgo(comment.createdAt)}</span>
-                                        </div>
-                                        <p className="text-xs text-slate-800 font-medium">{comment.text}</p>
+                                <div key={comment.id} className="flex gap-3">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${comment.userId === requester.id ? 'bg-cyan-100 text-cyan-600' : 'bg-slate-100 text-slate-500'}`}>
+                                        <span className="text-xs font-bold">{comment.userId === requester.id ? 'OP' : 'U'}</span>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
+                                        <p className="text-sm text-slate-700">{comment.text}</p>
+                                        <p className="text-[10px] text-slate-400 mt-1">{timeAgo(comment.createdAt)}</p>
                                     </div>
                                 </div>
                             ))
                         ) : (
-                            <p className="text-slate-400 italic text-xs font-mono border border-dashed border-slate-300 p-2 text-center">NO_DATA_FOUND</p>
+                            <div className="text-center py-8 bg-slate-100/50 rounded-2xl border border-dashed border-slate-200">
+                                <p className="text-slate-400 text-sm">No comments yet. Be the first!</p>
+                            </div>
                         )}
                     </div>
 
                     {onAddComment && (
-                        <form onSubmit={handleCommentSubmit} className="relative flex gap-2">
-                            <div className="relative flex-1">
-                                <input 
+                        <div className="sticky bottom-0 bg-white p-2 border border-slate-200 rounded-2xl shadow-sm flex items-center gap-2">
+                             <input 
                                 type="text" 
                                 value={newComment}
-                                onChange={(e) => { setNewComment(e.target.value); setCommentError(null); }}
-                                placeholder={currentUser ? "Enter transmission..." : "Login required"}
-                                className={`w-full pl-3 pr-10 py-2 text-xs border-2 font-mono outline-none transition-all ${commentError ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-slate-900'}`}
+                                onChange={(e) => { setNewComment(e.target.value); }}
+                                placeholder={currentUser ? "Add a comment..." : "Login to comment"}
+                                className="flex-1 bg-transparent border-none outline-none text-sm px-2"
                                 disabled={isPostingComment || isRecordingComment || !currentUser}
-                                />
-                                {isRecordingComment ? (
-                                    <button type="button" onClick={stopRecording} className="absolute right-2 top-1.5 text-red-600 animate-pulse"><StopCircle className="h-4 w-4" /></button>
-                                ) : (
-                                    <button type="button" onClick={startRecording} disabled={!currentUser} className="absolute right-2 top-1.5 text-slate-400 hover:text-blue-600"><Mic className="h-4 w-4" /></button>
-                                )}
-                            </div>
+                            />
+                            {isRecordingComment ? (
+                                <button type="button" onClick={stopRecording} className="p-2 bg-red-50 text-red-500 rounded-full animate-pulse"><StopCircle className="w-4 h-4" /></button>
+                            ) : (
+                                <button type="button" onClick={startRecording} disabled={!currentUser} className="p-2 text-slate-400 hover:bg-slate-50 rounded-full hover:text-cyan-600 transition-colors"><Mic className="w-4 h-4" /></button>
+                            )}
                             <button 
-                                type="submit"
+                                onClick={handleCommentSubmit}
                                 disabled={(!newComment.trim() && !isRecordingComment) || isPostingComment || !currentUser}
-                                className="px-4 bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-50 font-mono text-xs font-bold"
+                                className="p-2 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 disabled:opacity-50 transition-colors"
                             >
-                                SEND
+                                <Send className="w-4 h-4" />
                             </button>
-                        </form>
+                        </div>
                     )}
                 </div>
             </div>
         </div>
         
         {/* Footer Actions */}
-        <div className="p-4 bg-slate-100 border-t-2 border-slate-900">
+        <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-5px_20px_rgba(0,0,0,0.02)] z-20">
              {request.status === RequestStatus.FULFILLED || request.status === RequestStatus.RECEIVED ? (
-                 <div className="w-full bg-green-100 text-green-800 font-black py-3 text-center border-2 border-green-600 uppercase tracking-widest text-sm flex items-center justify-center gap-2">
+                 <div className="w-full bg-green-50 text-green-700 py-3 rounded-xl border border-green-200 text-sm font-bold flex items-center justify-center gap-2">
                      <CheckCircle className="h-5 w-5" /> 
-                     {request.status === RequestStatus.RECEIVED ? 'MISSION_COMPLETE' : 'ASSET_DEPLOYED'}
+                     {request.status === RequestStatus.RECEIVED ? 'Item Received' : 'Item Fulfilled'}
                  </div>
              ) : isMyRequest ? (
-                <Button onClick={handleDelete} size="lg" variant="danger" className="w-full font-mono font-bold uppercase tracking-widest">
-                    <Trash2 className="h-4 w-4 mr-2" /> TERMINATE_REQUEST
+                <Button onClick={handleDelete} size="lg" variant="danger" className="w-full rounded-xl">
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete Request
                 </Button>
              ) : (
-                <Button onClick={onFulfill} size="lg" variant="primary" className="w-full font-mono font-bold uppercase tracking-widest shadow-hard-sm hover:shadow-hard transform hover:-translate-y-0.5 transition-transform bg-blue-600 hover:bg-blue-500">
-                    {isCandidate ? 'FINALIZE_PROTOCOL' : 'ENGAGE_PROTOCOL'}
+                <Button onClick={onFulfill} size="lg" variant="primary" className="w-full rounded-xl shadow-lg shadow-cyan-500/25">
+                    {isCandidate ? 'Finalize Fulfillment' : 'I Can Help with This!'}
                 </Button>
              )}
         </div>

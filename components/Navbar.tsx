@@ -53,10 +53,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   const NavItem = ({ id, label, icon: Icon, active }: any) => (
       <button
         onClick={() => { onNavigate(id); setActiveMenu('none'); }}
-        className={`h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${
+        className={`h-9 px-4 rounded-xl flex items-center gap-2 text-sm font-bold transition-all ${
             active 
-            ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
-            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            ? 'bg-cyan-100 text-cyan-700' 
+            : 'text-slate-500 hover:text-cyan-600 hover:bg-cyan-50'
         }`}
       >
           {Icon && <Icon className="h-4 w-4" />}
@@ -65,33 +65,33 @@ export const Navbar: React.FC<NavbarProps> = ({
   );
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 h-16" ref={navRef}>
+    <nav className="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-white/50 h-16 shadow-sm" ref={navRef}>
       <div className="max-w-7xl mx-auto px-4 h-full">
         <div className="flex justify-between items-center h-full">
           
-          <div className="flex items-center h-full gap-8">
+          <div className="flex items-center h-full gap-6">
               {/* Logo */}
               <div className="flex items-center cursor-pointer gap-2" onClick={() => onNavigate('feed')}>
-                <div className="bg-blue-600 text-white p-1.5 rounded-none">
+                <div className="bg-gradient-to-tr from-cyan-400 to-blue-500 text-white p-2 rounded-xl shadow-lg shadow-cyan-500/20 transform rotate-3 hover:rotate-6 transition-transform">
                     <Gift className="h-5 w-5" />
                 </div>
-                <span className="font-bold text-xl tracking-tight text-slate-900 uppercase">buymethis</span>
+                <span className="font-bold text-xl tracking-tight text-slate-800">buymethis</span>
               </div>
               
               {/* Desktop Nav */}
-              <div className="hidden md:flex h-full">
+              <div className="hidden md:flex items-center gap-2">
                 <NavItem id="feed" label="Feed" icon={Globe} active={currentView === 'feed'} />
                 <NavItem id="forum" label="Forum" icon={MessageSquare} active={currentView === 'forum'} />
                 <NavItem id="leaderboard" label="Rankings" icon={Trophy} active={currentView === 'leaderboard'} />
               </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {/* Request Button */}
-            <div className="hidden md:block mr-2">
+            <div className="hidden md:block">
                  <button
                     onClick={() => onNavigate('create')}
-                    className="flex items-center gap-2 px-5 py-2 bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition-colors rounded-none"
+                    className="flex items-center gap-2 px-5 py-2 bg-slate-800 text-white text-sm font-bold hover:bg-slate-900 transition-colors rounded-full shadow-lg shadow-slate-900/20"
                  >
                     <Plus className="h-4 w-4" />
                     <span>Post Request</span>
@@ -103,28 +103,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="relative h-full flex items-center">
                     <button
                         onClick={() => toggleMenu('notifications')}
-                        className={`p-2 relative hover:bg-slate-100 transition-colors rounded-none ${activeMenu === 'notifications' ? 'bg-slate-100' : ''}`}
+                        className={`p-2.5 rounded-full hover:bg-cyan-50 transition-colors relative ${activeMenu === 'notifications' ? 'bg-cyan-100 text-cyan-600' : 'text-slate-500'}`}
                     >
-                        <Bell className="h-5 w-5 text-slate-600" />
+                        <Bell className="h-5 w-5" />
                         {unreadCount > 0 && (
-                        <span className="absolute top-1 right-1 block h-2.5 w-2.5 bg-red-500 rounded-none border border-white" />
+                        <span className="absolute top-0 right-0 block h-3 w-3 bg-pink-500 rounded-full border-2 border-white animate-bounce" />
                         )}
                     </button>
 
                     {activeMenu === 'notifications' && (
-                        <div className="absolute top-full right-[-60px] md:right-0 mt-0 w-80 bg-white border border-slate-200 shadow-xl z-50 rounded-none">
-                            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                                <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Notifications</span>
-                                {unreadCount > 0 && <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 font-bold">{unreadCount} New</span>}
+                        <div className="absolute top-full right-[-60px] md:right-0 mt-2 w-80 bg-white/95 backdrop-blur-xl border border-cyan-100 shadow-glow rounded-2xl z-50 overflow-hidden">
+                            <div className="px-4 py-3 border-b border-slate-100 bg-cyan-50/50 flex justify-between items-center">
+                                <span className="text-xs font-bold uppercase text-cyan-600 tracking-wider">Notifications</span>
+                                {unreadCount > 0 && <span className="bg-pink-100 text-pink-600 text-[10px] px-2 py-0.5 rounded-full font-bold">{unreadCount} New</span>}
                             </div>
-                            <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                            <div className="max-h-80 overflow-y-auto custom-scrollbar p-2">
                                 {notifications.length > 0 ? (
                                 notifications.map((n) => (
-                                    <div key={n.id} className={`px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors ${!n.isRead ? 'bg-blue-50/30' : ''}`}>
+                                    <div key={n.id} className={`p-3 mb-1 rounded-xl hover:bg-cyan-50 transition-colors ${!n.isRead ? 'bg-blue-50/50 border border-blue-100' : ''}`}>
                                         <div className="flex gap-3">
-                                            <div className={`mt-1.5 w-1.5 h-1.5 shrink-0 ${n.type === 'success' ? 'bg-green-500' : n.type === 'alert' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                                            <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${n.type === 'success' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : n.type === 'alert' ? 'bg-pink-500' : 'bg-cyan-400'}`} />
                                             <div>
-                                                <p className="text-sm text-slate-800 leading-snug">{n.message}</p>
+                                                <p className="text-sm text-slate-700 leading-snug font-medium">{n.message}</p>
                                                 <span className="text-[10px] text-slate-400 mt-1 block font-mono">{new Date(n.createdAt).toLocaleTimeString()}</span>
                                             </div>
                                         </div>
@@ -132,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 ))
                                 ) : (
                                 <div className="px-5 py-8 text-center">
-                                    <p className="text-slate-400 text-xs">No notifications.</p>
+                                    <p className="text-slate-400 text-xs">No notifications yet.</p>
                                 </div>
                                 )}
                             </div>
@@ -142,30 +142,30 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
 
             {/* User Profile / Auth */}
-            <div className="relative ml-2">
+            <div className="relative">
               {user ? (
                   <>
                     <button
                         onClick={() => toggleMenu('user')}
-                        className={`flex items-center gap-3 pl-1 pr-2 py-1 hover:bg-slate-100 transition-colors rounded-none border border-transparent hover:border-slate-200 ${activeMenu === 'user' ? 'bg-slate-100 border-slate-200' : ''}`}
+                        className={`flex items-center gap-2 pl-1 pr-3 py-1 hover:bg-white/60 transition-colors rounded-full border border-transparent hover:border-cyan-100 ${activeMenu === 'user' ? 'bg-white border-cyan-200' : ''}`}
                     >
-                        <img src={user.avatarUrl} alt={user.displayName} className="h-8 w-8 object-cover bg-slate-200 rounded-none" />
-                        <span className="hidden md:block text-sm font-medium text-slate-700">{user.displayName}</span>
+                        <img src={user.avatarUrl} alt={user.displayName} className="h-8 w-8 object-cover rounded-full border-2 border-white shadow-sm" />
+                        <span className="hidden md:block text-sm font-bold text-slate-700">{user.displayName}</span>
                         <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform ${activeMenu === 'user' ? 'rotate-180' : ''}`} />
                     </button>
 
                     {activeMenu === 'user' && (
-                        <div className="absolute top-full right-0 mt-0 w-56 bg-white border border-slate-200 shadow-xl z-50 rounded-none">
-                            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                                <p className="text-sm font-bold text-slate-900">{user.displayName}</p>
-                                <p className="text-xs text-slate-500 font-mono">@{user.handle}</p>
+                        <div className="absolute top-full right-0 mt-2 w-64 bg-white/95 backdrop-blur-xl border border-cyan-100 shadow-glow z-50 rounded-2xl overflow-hidden">
+                            <div className="px-5 py-4 bg-gradient-to-r from-cyan-50 to-blue-50 border-b border-cyan-100">
+                                <p className="text-sm font-bold text-slate-800">{user.displayName}</p>
+                                <p className="text-xs text-cyan-600 font-medium">@{user.handle}</p>
                             </div>
                             
-                            <div className="py-1">
+                            <div className="p-2">
                                 {user.isAdmin && (
                                     <button 
                                     onClick={() => { onNavigate('admin'); setActiveMenu('none'); }}
-                                    className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+                                    className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 flex items-center gap-2 transition-colors rounded-xl"
                                     >
                                     <Shield className="h-4 w-4" /> Admin Console
                                     </button>
@@ -173,16 +173,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                                 <button 
                                 onClick={() => { onNavigate('profile'); setActiveMenu('none'); }}
-                                className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+                                className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 flex items-center gap-2 transition-colors rounded-xl"
                                 >
                                 <UserIcon className="h-4 w-4" /> My Profile
                                 </button>
                             </div>
 
-                            <div className="border-t border-slate-100 py-1">
+                            <div className="border-t border-slate-100 p-2">
                                 <button 
                                     onClick={() => { onLogout(); setActiveMenu('none'); }}
-                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                    className="w-full text-left px-4 py-2 text-sm text-pink-500 hover:bg-pink-50 hover:text-pink-600 flex items-center gap-2 transition-colors rounded-xl font-medium"
                                 >
                                 <LogOut className="h-4 w-4" /> Log Out
                                 </button>
@@ -193,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               ) : (
                   <button 
                     onClick={onLogin}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors rounded-none"
+                    className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-bold hover:shadow-lg hover:shadow-cyan-500/25 transition-all rounded-full"
                   >
                       <LogIn className="h-4 w-4" />
                       <span className="hidden sm:inline">Log In</span>
@@ -202,7 +202,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Mobile Menu Button */}
-            <button className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-none ml-2" onClick={() => toggleMenu('mobile')}>
+            <button className="md:hidden p-2 text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 rounded-full" onClick={() => toggleMenu('mobile')}>
                 {activeMenu === 'mobile' ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
@@ -210,23 +210,23 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Dropdown */}
         {activeMenu === 'mobile' && (
-            <div className="md:hidden absolute top-16 left-0 right-0 bg-white border-b border-slate-200 shadow-lg z-40">
-                <div className="flex flex-col">
-                    <button onClick={() => { onNavigate('feed'); setActiveMenu('none'); }} className="p-4 border-b border-slate-100 text-left font-medium text-slate-700 flex items-center gap-3 hover:bg-slate-50">
-                        <Globe className="h-5 w-5 text-blue-500" /> Feed
+            <div className="md:hidden absolute top-20 left-4 right-4 bg-white/95 backdrop-blur-xl border border-cyan-100 shadow-glow z-40 rounded-3xl p-2 overflow-hidden animate-in slide-in-from-top-4 fade-in">
+                <div className="flex flex-col gap-1">
+                    <button onClick={() => { onNavigate('feed'); setActiveMenu('none'); }} className="p-4 rounded-xl text-left font-bold text-slate-700 flex items-center gap-3 hover:bg-cyan-50 hover:text-cyan-600">
+                        <Globe className="h-5 w-5 text-cyan-400" /> Feed
                     </button>
-                    <button onClick={() => { onNavigate('forum'); setActiveMenu('none'); }} className="p-4 border-b border-slate-100 text-left font-medium text-slate-700 flex items-center gap-3 hover:bg-slate-50">
-                        <MessageSquare className="h-5 w-5 text-blue-500" /> Forum
+                    <button onClick={() => { onNavigate('forum'); setActiveMenu('none'); }} className="p-4 rounded-xl text-left font-bold text-slate-700 flex items-center gap-3 hover:bg-cyan-50 hover:text-cyan-600">
+                        <MessageSquare className="h-5 w-5 text-cyan-400" /> Forum
                     </button>
-                    <button onClick={() => { onNavigate('leaderboard'); setActiveMenu('none'); }} className="p-4 border-b border-slate-100 text-left font-medium text-slate-700 flex items-center gap-3 hover:bg-slate-50">
-                        <Trophy className="h-5 w-5 text-blue-500" /> Rankings
+                    <button onClick={() => { onNavigate('leaderboard'); setActiveMenu('none'); }} className="p-4 rounded-xl text-left font-bold text-slate-700 flex items-center gap-3 hover:bg-cyan-50 hover:text-cyan-600">
+                        <Trophy className="h-5 w-5 text-cyan-400" /> Rankings
                     </button>
                     {user?.isAdmin && (
-                        <button onClick={() => { onNavigate('admin'); setActiveMenu('none'); }} className="p-4 border-b border-slate-100 text-left font-medium text-purple-700 flex items-center gap-3 hover:bg-slate-50">
+                        <button onClick={() => { onNavigate('admin'); setActiveMenu('none'); }} className="p-4 rounded-xl text-left font-bold text-purple-700 flex items-center gap-3 hover:bg-purple-50">
                             <Shield className="h-5 w-5 text-purple-500" /> Admin
                         </button>
                     )}
-                    <button onClick={() => { onNavigate('create'); setActiveMenu('none'); }} className="p-4 bg-slate-50 text-blue-700 text-left font-bold flex items-center gap-3">
+                    <button onClick={() => { onNavigate('create'); setActiveMenu('none'); }} className="p-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-left font-bold flex items-center gap-3 shadow-lg shadow-cyan-500/20 mt-2">
                         <Plus className="h-5 w-5" /> Post Request
                     </button>
                 </div>
