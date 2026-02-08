@@ -1,0 +1,8 @@
+{
+  "name": "buymethis",
+  "description": "A social, location-based request board where users fulfill items for others directly.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ]
+}
