@@ -15,12 +15,12 @@ import { Hero } from './components/Hero';
 import { Auth } from './components/Auth';
 import { RequestItem, RequestStatus, LocationFilter, User, Notification, Category, ForumThread, ForumCategory, ForumReply } from './types';
 import { Filter, Search, Package, Gift, ArrowLeft, Map, List, Loader2 } from 'lucide-react';
-import { supabase, base64ToFile, uploadImage } from './services/supabase';
+import { db, base64ToFile, uploadImage } from './services/db';
 import confetti from 'canvas-confetti';
 
 const App: React.FC = () => {
   // Auth State
-  const [session, setSession] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   
   // App State
@@ -51,68 +51,44 @@ const App: React.FC = () => {
   // --- INITIALIZATION ---
 
   useEffect(() => {
-    // 1. Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchUserProfile(session.user.id);
-      setAuthLoading(false);
-    });
-
-    // 2. Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchUserProfile(session.user.id);
-      } else {
-        setCurrentUser(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    checkSession();
   }, []);
 
-  useEffect(() => {
-    if (session && currentUser) {
-      fetchRequests();
-      fetchAllUsers(); 
-      fetchForumThreads();
-      fetchNotifications();
-      
-      // Realtime Subscriptions
-      const requestSub = supabase.channel('public:requests').on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, fetchRequests).subscribe();
-      const forumSub = supabase.channel('public:forum_threads').on('postgres_changes', { event: '*', schema: 'public', table: 'forum_threads' }, fetchForumThreads).subscribe();
-      const replySub = supabase.channel('public:forum_replies').on('postgres_changes', { event: '*', schema: 'public', table: 'forum_replies' }, fetchForumThreads).subscribe();
-      const notifSub = supabase.channel('public:notifications').on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUser.id}` }, fetchNotifications).subscribe();
-
-      return () => {
-        supabase.removeChannel(requestSub);
-        supabase.removeChannel(forumSub);
-        supabase.removeChannel(replySub);
-        supabase.removeChannel(notifSub);
-      };
+  const checkSession = async () => {
+    setAuthLoading(true);
+    const userId = db.getSessionId();
+    if (userId) {
+      await fetchUserProfile(userId);
+      setIsAuthenticated(true);
+    } else {
+      setIsAuthenticated(false);
     }
-  }, [session, currentUser]);
+    setAuthLoading(false);
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      loadData();
+    }
+  }, [isAuthenticated, currentUser]);
+
+  const loadData = async () => {
+     setLoading(true);
+     await Promise.all([
+         fetchRequests(),
+         fetchAllUsers(),
+         fetchForumThreads(),
+         fetchNotifications()
+     ]);
+     setLoading(false);
+  };
 
   // --- DATA FETCHING ---
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (data) {
-         const user: User = {
-            id: data.id,
-            displayName: data.display_name,
-            handle: data.handle,
-            bio: data.bio || '',
-            avatarUrl: data.avatar_url,
-            location: data.location,
-            trustScore: data.trust_score,
-            badges: data.badges || [],
-            projects: data.projects || [],
-            hobbies: data.hobbies || []
-         };
+      const user = await db.getUser(userId);
+      if (user) {
          setCurrentUser(user);
          setUsers(prev => ({ ...prev, [user.id]: user }));
       }
@@ -120,101 +96,28 @@ const App: React.FC = () => {
   };
 
   const fetchAllUsers = async () => {
-      const { data } = await supabase.from('profiles').select('*');
-      if (data) {
-          const userMap: Record<string, User> = {};
-          data.forEach((row: any) => {
-              userMap[row.id] = {
-                id: row.id,
-                displayName: row.display_name,
-                handle: row.handle,
-                bio: row.bio || '',
-                avatarUrl: row.avatar_url,
-                location: row.location,
-                trustScore: row.trust_score,
-                badges: row.badges || [],
-                projects: row.projects || [],
-                hobbies: row.hobbies || []
-              };
-          });
-          setUsers(prev => ({ ...prev, ...userMap }));
-      }
+      const allUsers = await db.getAllUsers();
+      const userMap: Record<string, User> = {};
+      allUsers.forEach(u => userMap[u.id] = u);
+      setUsers(prev => ({ ...prev, ...userMap }));
   };
 
   const fetchRequests = async () => {
     try {
-      const { data } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
-      if (data) {
-        setRequests(data.map((row: any) => ({
-          id: row.id,
-          requesterId: row.requester_id,
-          title: row.title,
-          reason: row.reason,
-          category: row.category,
-          status: row.status,
-          location: row.location,
-          createdAt: row.created_at,
-          coordinates: row.coordinates_lat ? { lat: row.coordinates_lat, lng: row.coordinates_lng } : undefined,
-          shippingAddress: row.shipping_address,
-          fulfillerId: row.fulfiller_id,
-          trackingNumber: row.tracking_number,
-          proofOfPurchaseImage: row.proof_of_purchase_image,
-          giftMessage: row.gift_message,
-          thankYouMessage: row.thank_you_message,
-          receiptVerificationStatus: row.receipt_verification_status,
-          enrichedData: row.enriched_data,
-          comments: row.comments || [],
-          productUrl: '' 
-        })));
-      }
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+      const data = await db.getRequests();
+      setRequests(data);
+    } catch (err) { console.error(err); }
   };
 
   const fetchForumThreads = async () => {
-      // Fetch threads and join with replies
-      const { data: threads } = await supabase.from('forum_threads').select('*').order('created_at', { ascending: false });
-      const { data: replies } = await supabase.from('forum_replies').select('*').order('created_at', { ascending: true });
-      
-      if (threads) {
-          const mappedThreads: ForumThread[] = threads.map((t: any) => ({
-              id: t.id,
-              authorId: t.author_id,
-              title: t.title,
-              content: t.content,
-              category: t.category,
-              createdAt: t.created_at,
-              views: t.views,
-              likes: t.likes || [],
-              replies: replies ? replies.filter((r: any) => r.thread_id === t.id).map((r: any) => ({
-                  id: r.id,
-                  threadId: r.thread_id,
-                  authorId: r.author_id,
-                  content: r.content,
-                  createdAt: r.created_at
-              })) : []
-          }));
-          setForumThreads(mappedThreads);
-      }
+      const data = await db.getThreads();
+      setForumThreads(data);
   };
 
   const fetchNotifications = async () => {
       if (!currentUser) return;
-      const { data } = await supabase.from('notifications')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false });
-        
-      if (data) {
-          setNotifications(data.map((n: any) => ({
-              id: n.id,
-              userId: n.user_id,
-              message: n.message,
-              type: n.type,
-              isRead: n.is_read,
-              createdAt: n.created_at,
-              relatedRequestId: n.related_request_id
-          })));
-      }
+      const data = await db.getNotifications(currentUser.id);
+      setNotifications(data);
   };
 
   // --- ACTIONS ---
@@ -232,35 +135,27 @@ const App: React.FC = () => {
   };
 
   const createNotification = async (userId: string, message: string, type: 'info' | 'success' | 'alert' = 'info', requestId?: string) => {
-      await supabase.from('notifications').insert({
+      await db.createNotification({
           id: `notif_${Date.now()}_${Math.random()}`,
-          user_id: userId,
+          userId,
           message,
           type,
-          created_at: new Date().toISOString(),
-          related_request_id: requestId,
-          is_read: false
+          createdAt: new Date().toISOString(),
+          relatedRequestId: requestId,
+          isRead: false
       });
   };
 
-  const handleSignOut = async () => {
-      await supabase.auth.signOut();
-      setSession(null);
+  const handleSignOut = () => {
+      db.signOut();
+      setIsAuthenticated(false);
       setCurrentUser(null);
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
     if (!currentUser) return;
     try {
-        const { error } = await supabase.from('profiles').update({
-            display_name: updatedUser.displayName,
-            bio: updatedUser.bio,
-            location: updatedUser.location,
-            projects: updatedUser.projects,
-            hobbies: updatedUser.hobbies
-        }).eq('id', currentUser.id);
-
-        if (error) throw error;
+        await db.updateUser(updatedUser);
         setCurrentUser(updatedUser);
         setUsers(prev => ({ ...prev, [updatedUser.id]: updatedUser }));
         setIsEditProfileOpen(false);
@@ -272,29 +167,10 @@ const App: React.FC = () => {
     if (!currentUser) return;
     setLoading(true);
     try {
-      let finalImageUrl = newRequest.enrichedData?.imageUrl;
-      if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
-          const file = base64ToFile(finalImageUrl, `req_${Date.now()}.jpg`);
-          const uploadedUrl = await uploadImage(file);
-          if (uploadedUrl) finalImageUrl = uploadedUrl;
-      }
-
-      const { error } = await supabase.from('requests').insert({
-        id: newRequest.id,
-        requester_id: currentUser.id,
-        title: newRequest.title,
-        reason: newRequest.reason,
-        category: newRequest.category,
-        status: newRequest.status,
-        location: newRequest.location,
-        created_at: newRequest.createdAt,
-        coordinates_lat: newRequest.coordinates?.lat,
-        coordinates_lng: newRequest.coordinates?.lng,
-        shipping_address: newRequest.shippingAddress,
-        enriched_data: { ...newRequest.enrichedData, imageUrl: finalImageUrl }
-      });
+      // Image is already base64 in enrichedData.imageUrl for local DB/Neon storage
+      // In a real production app, we would upload to a bucket here.
+      await db.createRequest(newRequest);
       
-      if (error) throw error;
       handleNavigate('feed');
       fetchRequests();
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -306,12 +182,7 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
     try {
-      const { error } = await supabase
-        .from('requests')
-        .update({ status: RequestStatus.PENDING, fulfiller_id: currentUser.id })
-        .eq('id', requestId);
-
-      if (error) throw error;
+      await db.updateRequest(requestId, { status: RequestStatus.PENDING, fulfillerId: currentUser.id });
       
       if (req) createNotification(req.requesterId, `${currentUser.displayName} committed to buy your "${req.title}"!`, 'success', req.id);
       
@@ -326,22 +197,13 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
     try {
-        let receiptUrl = receiptImage;
-        if (receiptImage && receiptImage.startsWith('data:image')) {
-             const file = base64ToFile(receiptImage, `receipt_${requestId}.jpg`);
-             const uploadedUrl = await uploadImage(file);
-             if (uploadedUrl) receiptUrl = uploadedUrl;
-        }
-
-        const { error } = await supabase.from('requests').update({ 
+        await db.updateRequest(requestId, {
             status: RequestStatus.FULFILLED, 
-            tracking_number: orderId,
-            proof_of_purchase_image: receiptUrl,
-            gift_message: giftMessage,
-            receipt_verification_status: verificationStatus
-        }).eq('id', requestId);
-
-        if (error) throw error;
+            trackingNumber: orderId,
+            proofOfPurchaseImage: receiptImage,
+            giftMessage: giftMessage,
+            receiptVerificationStatus: verificationStatus
+        });
 
         if (req) createNotification(req.requesterId, `${currentUser.displayName} purchased your item! Order ID: ${orderId}`, 'success', req.id);
 
@@ -357,8 +219,7 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
     try {
-        const { error } = await supabase.from('requests').update({ tracking_number: trackingNumber }).eq('id', requestId);
-        if (error) throw error;
+        await db.updateRequest(requestId, { trackingNumber });
         
         if (req) createNotification(req.requesterId, `Tracking updated for "${req.title}": ${trackingNumber}`, 'info', req.id);
 
@@ -377,21 +238,23 @@ const App: React.FC = () => {
     if (!thankYouModalRequest || !currentUser) return;
     
     try {
-      const { error } = await supabase.from('requests').update({ status: RequestStatus.RECEIVED, thank_you_message: message }).eq('id', thankYouModalRequest.id);
-      if (error) throw error;
+      await db.updateRequest(thankYouModalRequest.id, { status: RequestStatus.RECEIVED, thankYouMessage: message });
       
       if (thankYouModalRequest.fulfillerId) {
           createNotification(thankYouModalRequest.fulfillerId, `${currentUser.displayName} received the item and says: "${message}"`, 'success', thankYouModalRequest.id);
       }
 
       if (forumPostData) {
-          await supabase.from('forum_threads').insert({
+          await db.createThread({
               id: `th_${Date.now()}`,
-              author_id: currentUser.id,
+              authorId: currentUser.id,
               title: forumPostData.title,
               content: forumPostData.content,
               category: ForumCategory.STORIES,
-              created_at: new Date().toISOString()
+              createdAt: new Date().toISOString(),
+              replies: [],
+              views: 0,
+              likes: []
           });
           fetchForumThreads();
           showToast('Shared as a success story on the forum!');
@@ -414,8 +277,7 @@ const App: React.FC = () => {
       const updatedComments = [...targetRequest.comments, newComment];
 
       try {
-        const { error } = await supabase.from('requests').update({ comments: updatedComments }).eq('id', requestId);
-        if (error) throw error;
+        await db.updateRequest(requestId, { comments: updatedComments });
         
         if (targetRequest.requesterId !== currentUser.id) {
             createNotification(targetRequest.requesterId, `${currentUser.displayName} commented on "${targetRequest.title}"`, 'info', requestId);
@@ -428,15 +290,7 @@ const App: React.FC = () => {
   // --- FORUM HANDLERS ---
   const handleAddForumThread = async (thread: ForumThread) => {
       try {
-          const { error } = await supabase.from('forum_threads').insert({
-              id: thread.id,
-              author_id: thread.authorId,
-              title: thread.title,
-              content: thread.content,
-              category: thread.category,
-              created_at: thread.createdAt
-          });
-          if (error) throw error;
+          await db.createThread(thread);
           fetchForumThreads();
           showToast('Discussion started!');
       } catch (e) { showToast('Failed to start thread', 'error'); }
@@ -444,21 +298,14 @@ const App: React.FC = () => {
 
   const handleAddForumReply = async (reply: ForumReply) => {
       try {
-          const { error } = await supabase.from('forum_replies').insert({
-              id: reply.id,
-              thread_id: reply.threadId,
-              author_id: reply.authorId,
-              content: reply.content,
-              created_at: reply.createdAt
-          });
-          if (error) throw error;
+          await db.createReply(reply);
           fetchForumThreads();
       } catch (e) { showToast('Failed to reply', 'error'); }
   };
 
   const handleMarkNotificationsRead = async () => {
       if (!currentUser) return;
-      await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id);
+      await db.markNotificationsRead(currentUser.id);
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
@@ -479,7 +326,7 @@ const App: React.FC = () => {
   };
 
   if (authLoading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="h-12 w-12 text-indigo-500 animate-spin" /></div>;
-  if (!session || !currentUser) return <Auth onLoginSuccess={() => fetchUserProfile(session?.user?.id)} session={session} />;
+  if (!isAuthenticated || !currentUser) return <Auth onLoginSuccess={checkSession} />;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-12">
