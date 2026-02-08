@@ -135,12 +135,16 @@ export const Forum: React.FC<ForumProps> = ({ currentUser, users, threads, onAdd
 
   const renderPostBit = (authorId: string, content: string, date: string, postIndex: number, isReply: boolean = false) => {
       const author = users[authorId] || { 
+          id: 'unknown',
           displayName: 'Unknown', 
           handle: 'unknown', 
           avatarUrl: 'https://via.placeholder.com/50', 
           location: 'Unknown', 
           badges: [], 
-          trustScore: 0 
+          trustScore: 0,
+          bio: '',
+          projects: [],
+          hobbies: []
       };
 
       return (

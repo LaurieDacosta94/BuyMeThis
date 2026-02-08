@@ -156,10 +156,21 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
       }
 
       // Step 2: Simulate extracting data from URL if present
-      let enriched = { title: formData.title, price: 0, description: "User requested item", category: formData.category };
+      let enriched: { title: string; price: number; description: string; category: Category } = { 
+          title: formData.title, 
+          price: 0, 
+          description: "User requested item", 
+          category: formData.category 
+      };
       
       if (formData.productUrl) {
-          enriched = await enrichRequestData(formData.productUrl, formData.title, formData.reason);
+          const result = await enrichRequestData(formData.productUrl, formData.title, formData.reason);
+          // Cast the string category from result to Category enum, defaulting to OTHER if invalid
+          const validCategory = Object.values(Category).includes(result.category as Category)
+             ? (result.category as Category)
+             : Category.OTHER;
+          
+          enriched = { ...result, category: validCategory };
       }
       
       // Auto-update title if it was empty, otherwise keep user's
