@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RequestItem, RequestStatus, User } from '../types';
 import { Button } from './Button';
-import { Lock, Copy, CheckCircle, ExternalLink, X, Truck, Image as ImageIcon, Search, Sparkles, MapPin, Globe, ShieldAlert, Heart, Smile, Zap, Loader2, HandHelping } from 'lucide-react';
+import { Lock, Copy, CheckCircle, ExternalLink, X, Truck, Image as ImageIcon, Search, Sparkles, MapPin, Globe, ShieldAlert, Heart, Smile, Zap, Loader2, HandHelping, Terminal } from 'lucide-react';
 import { findBuyingOptions, findLocalStores, BuyingOption, generateGiftMessage, getSafetyTips, verifyReceipt } from '../services/geminiService';
 
 interface FulfillmentModalProps {
@@ -89,85 +89,88 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={onClose} />
       
-      <div className="relative bg-white w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-slate-700 shadow-2xl">
-        <button onClick={onClose} className="absolute top-4 right-4 text-white hover:text-slate-300 z-10">
-          <X className="h-5 w-5" />
-        </button>
-
-        <div className="bg-slate-900 p-6 text-white shrink-0 border-b border-slate-700">
-          <h3 className="text-lg font-bold uppercase tracking-widest flex items-center gap-2">
-            <HandHelping className="h-5 w-5 text-blue-500" />
-            {isFulfilled ? 'Update Tracking' : (isCandidate || isFulfiller) ? 'Fulfillment Protocol' : 'Initiate Help'}
-          </h3>
+      <div className="relative bg-white w-full max-w-lg shadow-hard border-2 border-slate-900 flex flex-col max-h-[90vh]">
+        
+        {/* System Header */}
+        <div className="bg-slate-900 p-2 text-white shrink-0 border-b-2 border-slate-900 flex justify-between items-center select-none">
+          <div className="flex items-center gap-2">
+             <div className="w-3 h-3 bg-blue-500 border border-black"></div>
+             <h3 className="text-xs font-bold font-mono uppercase tracking-widest flex items-center gap-2">
+                <Terminal className="h-3 w-3" />
+                {isFulfilled ? 'TRACKING_UPDATE' : (isCandidate || isFulfiller) ? 'PROTOCOL_EXECUTION' : 'INITIATE_HANDSHAKE'}
+             </h3>
+          </div>
+          <button onClick={onClose} className="hover:text-red-400"><X className="h-4 w-4" /></button>
         </div>
 
-        <div className="p-6 overflow-y-auto custom-scrollbar">
+        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50">
           {safetyTips.length > 0 && (
-             <div className="mb-6 bg-amber-50 border border-amber-200 p-3 text-amber-900 text-xs font-mono">
+             <div className="mb-6 bg-amber-50 border-l-4 border-amber-500 p-3 text-amber-900 text-xs font-mono shadow-sm">
                 <div className="flex items-center gap-2 font-bold mb-1 uppercase">
-                    <ShieldAlert className="h-4 w-4" /> Safety Protocol
+                    <ShieldAlert className="h-4 w-4" /> Hazard_Warning
                 </div>
-                <ul className="list-disc pl-5 space-y-1">
+                <ul className="list-disc pl-5 space-y-1 opacity-80">
                     {safetyTips.map((tip, i) => <li key={i}>{tip}</li>)}
                 </ul>
              </div>
           )}
 
-          <div className="flex gap-4 mb-6 border border-slate-200 p-4 bg-slate-50">
-            <img src={request.enrichedData?.imageUrl || 'https://picsum.photos/200'} alt={request.title} className="w-16 h-16 object-cover bg-white border border-slate-300 shrink-0" />
+          <div className="flex gap-4 mb-6 border-2 border-slate-200 p-4 bg-white">
+            <img src={request.enrichedData?.imageUrl || 'https://picsum.photos/200'} alt={request.title} className="w-16 h-16 object-cover border-2 border-slate-900 shrink-0" />
             <div>
-              <h4 className="font-bold text-slate-900 text-sm">{request.title}</h4>
-              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{request.reason}</p>
+              <h4 className="font-black text-slate-900 text-sm uppercase tracking-tight">{request.title}</h4>
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2 font-mono">{request.reason}</p>
             </div>
           </div>
 
           {!isCandidate && !isFulfiller ? (
             <div className="space-y-4">
-               <div className="bg-slate-50 border border-slate-200 p-4 text-slate-700 text-xs">
+               <div className="bg-slate-200 border border-slate-300 p-4 text-slate-700 text-xs font-mono">
                 <p className="font-bold mb-1 flex items-center gap-2 uppercase">
-                  <Lock className="h-3 w-3" /> Address Encrypted
+                  <Lock className="h-3 w-3" /> Data_Encrypted
                 </p>
-                Commit to help to reveal shipping details.
+                Access to shipping coordinates restricted until commitment verified.
               </div>
-              <Button onClick={handleOfferHelp} className="w-full font-bold uppercase tracking-widest" size="lg">I Can Help</Button>
+              <Button onClick={handleOfferHelp} className="w-full font-bold uppercase tracking-widest font-mono bg-blue-600 hover:bg-blue-500 shadow-hard-sm" size="lg">Accept_Mission</Button>
             </div>
           ) : (
             <div className="space-y-6">
                {!isFulfiller && (
-                  <div className="bg-green-50 border border-green-200 p-3 text-green-800 text-xs font-bold uppercase flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4" /> Commitment Active
+                  <div className="bg-green-100 border border-green-500 p-2 text-green-900 text-xs font-bold uppercase flex items-center justify-center gap-2 font-mono">
+                      <CheckCircle className="h-4 w-4" /> Status: PENDING_ACTION
                   </div>
                )}
 
-              <div className="bg-white border border-slate-200 p-4">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Shipping Destination</label>
-                <div className="font-mono text-sm bg-slate-50 p-3 border border-slate-200 text-slate-800 relative group">
+              <div className="bg-white border-2 border-slate-900 p-4 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-slate-900 text-white text-[9px] px-2 font-mono uppercase">Target_Location</div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2 font-mono mt-2">Shipping_Vector</label>
+                <div className="font-mono text-sm bg-slate-100 p-3 border border-slate-300 text-slate-800 relative group">
                   <pre className="whitespace-pre-wrap font-sans">{request.shippingAddress}</pre>
-                  <button onClick={() => navigator.clipboard.writeText(request.shippingAddress)} className="absolute top-2 right-2 p-1 hover:bg-slate-200 text-slate-400 hover:text-blue-600"><Copy className="h-4 w-4" /></button>
+                  <button onClick={() => navigator.clipboard.writeText(request.shippingAddress)} className="absolute top-2 right-2 p-1 bg-white border border-slate-300 hover:bg-blue-50 text-slate-500 hover:text-blue-600"><Copy className="h-3 w-3" /></button>
                 </div>
               </div>
 
-              <div className="border border-slate-200">
-                <button onClick={() => setShowAssistant(!showAssistant)} className="w-full px-4 py-3 bg-slate-50 flex items-center justify-between text-slate-700 text-sm font-bold hover:bg-slate-100 transition-colors uppercase">
-                    <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-blue-600" /> Procurement Assistant</span>
+              <div className="border-2 border-slate-200 bg-white">
+                <button onClick={() => setShowAssistant(!showAssistant)} className="w-full px-4 py-3 bg-white flex items-center justify-between text-slate-900 text-xs font-bold hover:bg-slate-50 transition-colors uppercase font-mono border-b border-slate-100">
+                    <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-purple-600" /> AI_Procurement_Assist</span>
                 </button>
                 {showAssistant && (
-                    <div className="p-4 bg-white border-t border-slate-200">
+                    <div className="p-4 bg-slate-50 border-t border-slate-200">
                         <div className="flex gap-2 mb-4">
-                            <button onClick={() => {setSearchMode('online'); setSearchResult(null)}} className={`flex-1 py-2 text-xs font-bold uppercase border ${searchMode === 'online' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'}`}>Online</button>
-                            <button onClick={() => {setSearchMode('local'); setSearchResult(null)}} className={`flex-1 py-2 text-xs font-bold uppercase border ${searchMode === 'local' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'}`}>Local</button>
+                            <button onClick={() => {setSearchMode('online'); setSearchResult(null)}} className={`flex-1 py-1 text-[10px] font-bold uppercase border-2 font-mono ${searchMode === 'online' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-300'}`}>NET</button>
+                            <button onClick={() => {setSearchMode('local'); setSearchResult(null)}} className={`flex-1 py-1 text-[10px] font-bold uppercase border-2 font-mono ${searchMode === 'local' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-300'}`}>LOCAL</button>
                         </div>
                         {!searchResult ? (
-                            <Button size="sm" variant="outline" onClick={handleSearch} isLoading={isSearching} className="w-full uppercase" disabled={searchMode === 'local' && !currentUser.coordinates}>
-                                <Search className="h-3 w-3 mr-2" /> Search
+                            <Button size="sm" variant="outline" onClick={handleSearch} isLoading={isSearching} className="w-full uppercase font-mono text-xs border-slate-400" disabled={searchMode === 'local' && !currentUser.coordinates}>
+                                <Search className="h-3 w-3 mr-2" /> SCAN_MARKET
                             </Button>
                         ) : (
                             <div>
-                                <p className="text-xs text-slate-700 mb-3 font-mono">{searchResult.text}</p>
+                                <p className="text-xs text-slate-900 mb-3 font-mono font-bold">Suggestions:</p>
                                 {searchResult.options.map((opt, idx) => (
-                                    <a key={idx} href={opt.uri} target="_blank" rel="noopener noreferrer" className="block text-xs text-blue-600 hover:underline mb-1 truncate">
+                                    <a key={idx} href={opt.uri} target="_blank" rel="noopener noreferrer" className="block text-xs text-blue-700 hover:underline mb-2 truncate font-mono bg-white border border-slate-200 p-2">
                                         <ExternalLink className="h-3 w-3 inline mr-1" /> {opt.title}
                                     </a>
                                 ))}
@@ -177,55 +180,55 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
                 )}
               </div>
 
-              <div className="border-t border-slate-200 pt-4 space-y-4">
+              <div className="border-t-2 border-slate-200 pt-4 space-y-4">
                 {isFulfilled ? (
                    <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tracking ID</label>
-                     <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none font-mono text-sm mb-3" value={inputVal} onChange={(e) => setInputVal(e.target.value)} />
-                     <Button onClick={() => onUpdateTracking(request.id, inputVal)} disabled={!inputVal} className="w-full uppercase" variant="primary">Update Tracking</Button>
+                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2 font-mono">Tracking_ID</label>
+                     <input type="text" className="w-full px-3 py-2 border-2 border-slate-300 focus:border-blue-600 outline-none font-mono text-sm mb-3 bg-white" value={inputVal} onChange={(e) => setInputVal(e.target.value)} />
+                     <Button onClick={() => onUpdateTracking(request.id, inputVal)} disabled={!inputVal} className="w-full uppercase font-mono font-bold" variant="primary">Update_Data</Button>
                    </div>
                 ) : (
                   <>
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Order ID / Confirmation</label>
-                      <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none font-mono text-sm" value={inputVal} onChange={(e) => setInputVal(e.target.value)} />
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2 font-mono">Confirmation_Code / Order_ID</label>
+                      <input type="text" className="w-full px-3 py-2 border-2 border-slate-300 focus:border-blue-600 outline-none font-mono text-sm bg-white" value={inputVal} onChange={(e) => setInputVal(e.target.value)} />
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Gift Message</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 font-mono">Attached_Message</label>
                         <div className="relative">
-                            <textarea className="w-full px-3 py-2 border border-slate-300 rounded-none focus:border-blue-500 outline-none h-20 text-sm" placeholder="Optional message..." value={giftMessage} onChange={(e) => setGiftMessage(e.target.value)} />
+                            <textarea className="w-full px-3 py-2 border-2 border-slate-300 focus:border-blue-600 outline-none h-20 text-sm bg-white font-mono" placeholder="Optional..." value={giftMessage} onChange={(e) => setGiftMessage(e.target.value)} />
                              <div className="flex gap-2 mt-2">
-                                <button onClick={() => handleGenerateMessage('warm')} disabled={isGeneratingMessage} className="text-[10px] bg-slate-100 border border-slate-200 px-2 py-1 hover:bg-slate-200 uppercase font-bold">Warm</button>
-                                <button onClick={() => handleGenerateMessage('funny')} disabled={isGeneratingMessage} className="text-[10px] bg-slate-100 border border-slate-200 px-2 py-1 hover:bg-slate-200 uppercase font-bold">Funny</button>
+                                <button onClick={() => handleGenerateMessage('warm')} disabled={isGeneratingMessage} className="text-[9px] bg-white border border-slate-300 px-2 py-1 hover:bg-slate-100 uppercase font-bold font-mono">Tone:Warm</button>
+                                <button onClick={() => handleGenerateMessage('funny')} disabled={isGeneratingMessage} className="text-[9px] bg-white border border-slate-300 px-2 py-1 hover:bg-slate-100 uppercase font-bold font-mono">Tone:Funny</button>
                             </div>
                         </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Proof of Purchase</label>
-                      <div className="mt-1 border-2 border-slate-300 border-dashed hover:bg-slate-50 transition-colors relative p-4 text-center">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2 font-mono">Visual_Proof</label>
+                      <div className="mt-1 border-2 border-slate-300 border-dashed hover:bg-white hover:border-slate-500 transition-colors relative p-4 text-center bg-slate-50">
                         {receiptImage ? (
                           <div className="relative">
-                            <img src={receiptImage} alt="Receipt" className="mx-auto h-32 object-contain border border-slate-200" />
-                            <button onClick={() => { setReceiptImage(null); setVerificationResult(null); }} className="absolute top-0 right-0 bg-red-600 text-white p-1"><X className="h-3 w-3" /></button>
-                            {isVerifyingReceipt ? <div className="mt-2 text-xs text-blue-600 font-mono animate-pulse">Verifying...</div> : verificationResult && (
-                                <div className={`mt-2 text-xs font-bold uppercase ${verificationResult.status === 'verified' ? 'text-green-600' : 'text-amber-600'}`}>
-                                    {verificationResult.status}: {verificationResult.reasoning}
+                            <img src={receiptImage} alt="Receipt" className="mx-auto h-32 object-contain border border-slate-300 bg-white" />
+                            <button onClick={() => { setReceiptImage(null); setVerificationResult(null); }} className="absolute top-0 right-0 bg-red-600 text-white p-1 hover:bg-red-700"><X className="h-3 w-3" /></button>
+                            {isVerifyingReceipt ? <div className="mt-2 text-xs text-blue-600 font-mono animate-pulse">ANALYZING_IMAGE...</div> : verificationResult && (
+                                <div className={`mt-2 text-xs font-bold uppercase font-mono ${verificationResult.status === 'verified' ? 'text-green-600' : 'text-amber-600'}`}>
+                                    [{verificationResult.status}]: {verificationResult.reasoning}
                                 </div>
                             )}
                           </div>
                         ) : (
                           <label className="cursor-pointer block">
-                             <ImageIcon className="mx-auto h-8 w-8 text-slate-400 mb-2" />
-                             <span className="text-xs text-blue-600 font-bold uppercase">Upload Image</span>
+                             <ImageIcon className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                             <span className="text-xs text-blue-600 font-bold uppercase font-mono hover:underline">UPLOAD_IMAGE</span>
                              <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                           </label>
                         )}
                       </div>
                     </div>
 
-                    <Button onClick={() => onConfirmPurchase(request.id, inputVal, receiptImage || undefined, giftMessage, verificationResult?.status)} disabled={!inputVal || isVerifyingReceipt} className="w-full uppercase" variant="secondary">Confirm Purchase</Button>
+                    <Button onClick={() => onConfirmPurchase(request.id, inputVal, receiptImage || undefined, giftMessage, verificationResult?.status)} disabled={!inputVal || isVerifyingReceipt} className="w-full uppercase font-bold font-mono shadow-hard-sm" variant="secondary">EXECUTE_FULFILLMENT</Button>
                   </>
                 )}
               </div>

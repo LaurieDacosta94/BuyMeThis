@@ -16,7 +16,7 @@ import { ToastContainer, ToastMessage } from './components/Toast';
 import { Hero } from './components/Hero';
 import { Auth } from './components/Auth';
 import { RequestItem, RequestStatus, User, Notification, Category, ForumThread, ForumCategory, ForumReply } from './types';
-import { Search, Package, ArrowLeft, Map, List, Loader2, Database, AlertCircle } from 'lucide-react';
+import { Search, Package, ArrowLeft, Map, List, Loader2, Database, AlertCircle, X, Lock } from 'lucide-react';
 import { db } from './services/db';
 import confetti from 'canvas-confetti';
 import { calculateDistance } from './utils/geo';
@@ -464,13 +464,13 @@ const App: React.FC = () => {
   if (authLoading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="h-12 w-12 text-indigo-600 animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans pb-12 selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="min-h-screen bg-[#F1F5F9] text-slate-900 font-sans pb-12 selection:bg-indigo-100 selection:text-indigo-900">
       
       {!db.isNeon && (
-          <div className="bg-slate-900 text-white px-4 py-2 text-xs flex items-center justify-center gap-2">
+          <div className="bg-slate-900 text-white px-4 py-2 text-xs flex items-center justify-center gap-2 border-b-2 border-slate-700">
               <Database className="h-3 w-3 text-red-400" />
-              <span>Database not connected. Read-only demo mode.</span>
-              <button onClick={() => setShowAuthModal(true)} className="underline hover:text-indigo-300">Connect now</button>
+              <span className="font-mono">DB_OFFLINE // DEMO_MODE</span>
+              <button onClick={() => setShowAuthModal(true)} className="underline hover:text-indigo-300">CONNECT</button>
           </div>
       )}
 
@@ -493,35 +493,32 @@ const App: React.FC = () => {
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Hero />
             
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 sticky top-20 z-30">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-3 shadow-hard-sm border-2 border-slate-900 sticky top-20 z-30">
               <div className="relative w-full md:w-96">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                 <input 
                   type="text" 
-                  placeholder="Search requests..." 
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm bg-slate-50 focus:bg-white transition-all outline-none"
+                  placeholder="SEARCH_DB..." 
+                  className="w-full pl-10 pr-4 py-2 border-2 border-slate-200 focus:border-blue-600 bg-slate-50 focus:bg-white transition-all outline-none font-mono text-xs font-bold"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
 
               <div className="flex gap-3 w-full md:w-auto">
-                 <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
-                    <button onClick={() => setFeedMode('list')} className={`p-2.5 rounded-lg transition-all ${feedMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><List className="h-5 w-5" /></button>
-                    <button onClick={() => setFeedMode('map')} className={`p-2.5 rounded-lg transition-all ${feedMode === 'map' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Map className="h-5 w-5" /></button>
+                 <div className="bg-slate-100 p-1 flex border-2 border-slate-200">
+                    <button onClick={() => setFeedMode('list')} className={`p-2 transition-all ${feedMode === 'list' ? 'bg-white text-blue-600 shadow-sm border border-slate-300' : 'text-slate-400 hover:text-slate-600'}`}><List className="h-4 w-4" /></button>
+                    <button onClick={() => setFeedMode('map')} className={`p-2 transition-all ${feedMode === 'map' ? 'bg-white text-blue-600 shadow-sm border border-slate-300' : 'text-slate-400 hover:text-slate-600'}`}><Map className="h-4 w-4" /></button>
                  </div>
                  <div className="relative flex-1 md:flex-none">
                     <select 
-                        className="w-full md:w-48 appearance-none px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none cursor-pointer" 
+                        className="w-full md:w-48 appearance-none px-4 py-2 border-2 border-slate-200 bg-white text-xs font-bold font-mono focus:border-blue-600 outline-none cursor-pointer uppercase" 
                         value={categoryFilter} 
                         onChange={(e) => setCategoryFilter(e.target.value as Category | 'All')}
                     >
-                        <option value="All">All Categories</option>
-                        {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="All">FILTER: ALL</option>
+                        {Object.values(Category).map(c => <option key={c} value={c}>FILTER: {c.toUpperCase()}</option>)}
                     </select>
-                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                    </div>
                  </div>
               </div>
             </div>
@@ -558,12 +555,12 @@ const App: React.FC = () => {
                     />
                   ))}
                   {sortedRequests.length === 0 && !loading && (
-                      <div className="col-span-full py-24 text-center">
-                          <div className="bg-slate-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Package className="h-10 w-10 text-slate-300" />
+                      <div className="col-span-full py-24 text-center border-2 border-dashed border-slate-300">
+                          <div className="bg-slate-100 w-20 h-20 flex items-center justify-center mx-auto mb-4 border-2 border-slate-300">
+                            <Package className="h-8 w-8 text-slate-400" />
                           </div>
-                          <h3 className="text-xl font-bold text-slate-700 mb-2">No requests found</h3>
-                          <p className="text-slate-500">Try adjusting your filters or be the first to ask for help.</p>
+                          <h3 className="text-sm font-bold text-slate-600 uppercase font-mono mb-1">NO_DATA_FOUND</h3>
+                          <p className="text-xs text-slate-400 font-mono">Adjust filter parameters.</p>
                       </div>
                   )}
               </div>
@@ -571,25 +568,23 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {currentView === 'create' && currentUser && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><button onClick={() => setCurrentView('feed')} className="mb-6 text-sm font-medium text-slate-500 hover:text-indigo-600 flex items-center gap-2 transition-colors"><ArrowLeft className="h-4 w-4" /> Back to Feed</button><CreateRequest currentUser={currentUser} onSubmit={handleCreateRequest} onCancel={() => setCurrentView('feed')} /></div>}
+        {currentView === 'create' && currentUser && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><button onClick={() => setCurrentView('feed')} className="mb-6 text-xs font-bold uppercase text-slate-500 hover:text-blue-600 flex items-center gap-2 transition-colors font-mono"><ArrowLeft className="h-4 w-4" /> ABORT</button><CreateRequest currentUser={currentUser} onSubmit={handleCreateRequest} onCancel={() => setCurrentView('feed')} /></div>}
 
         {currentView === 'profile' && viewingProfileId && (
            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <button onClick={() => setCurrentView('feed')} className="mb-6 text-sm font-medium text-slate-500 hover:text-indigo-600 flex items-center gap-2 transition-colors"><ArrowLeft className="h-4 w-4" /> Back to Feed</button>
+             <button onClick={() => setCurrentView('feed')} className="mb-6 text-xs font-bold uppercase text-slate-500 hover:text-blue-600 flex items-center gap-2 transition-colors font-mono"><ArrowLeft className="h-4 w-4" /> RETURN</button>
              <UserProfile user={users[viewingProfileId]} requests={requests} isCurrentUser={viewingProfileId === currentUser?.id} onEditProfile={() => setIsEditProfileOpen(true)} />
              
-             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-8">
-                <div className="flex border-b border-slate-100">
-                    <button onClick={() => setProfileTab('requests')} className={`flex-1 py-4 text-sm font-bold text-center transition-colors relative ${profileTab === 'requests' ? 'text-indigo-600 bg-indigo-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
-                        Requests
-                        {profileTab === 'requests' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600" />}
+             <div className="bg-white shadow-hard border-2 border-slate-900 overflow-hidden mb-8">
+                <div className="flex border-b-2 border-slate-900">
+                    <button onClick={() => setProfileTab('requests')} className={`flex-1 py-3 text-xs font-bold font-mono uppercase text-center transition-colors relative ${profileTab === 'requests' ? 'text-white bg-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        REQUEST_LOG
                     </button>
-                    <button onClick={() => setProfileTab('commitments')} className={`flex-1 py-4 text-sm font-bold text-center transition-colors relative ${profileTab === 'commitments' ? 'text-indigo-600 bg-indigo-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
-                        Commitments
-                        {profileTab === 'commitments' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600" />}
+                    <button onClick={() => setProfileTab('commitments')} className={`flex-1 py-3 text-xs font-bold font-mono uppercase text-center transition-colors relative ${profileTab === 'commitments' ? 'text-white bg-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        MISSION_LOG
                     </button>
                 </div>
-                <div className="p-6 bg-slate-50/50">
+                <div className="p-6 bg-slate-50">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).length > 0 ? (
                             requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).map(req => (
@@ -610,7 +605,7 @@ const App: React.FC = () => {
                                 />
                             ))
                         ) : (
-                            <div className="col-span-full py-12 text-center text-slate-400 italic">No items to display.</div>
+                            <div className="col-span-full py-12 text-center text-slate-400 italic font-mono text-xs">NO_ENTRIES_FOUND</div>
                         )}
                     </div>
                 </div>
@@ -624,8 +619,8 @@ const App: React.FC = () => {
         {/* Admin Route */}
         {currentView === 'admin' && currentUser?.isAdmin && (
              <div className="animate-in fade-in">
-                 <button onClick={() => setCurrentView('feed')} className="fixed top-6 right-6 z-50 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 border border-slate-600">
-                    Exit Admin
+                 <button onClick={() => setCurrentView('feed')} className="fixed top-6 right-6 z-50 bg-red-600 text-white px-4 py-2 text-xs font-bold uppercase font-mono hover:bg-red-500 border-2 border-white shadow-lg">
+                    LOGOUT_ADMIN
                  </button>
                  <AdminPanel 
                     users={Object.values(users)} 
@@ -644,9 +639,15 @@ const App: React.FC = () => {
       
       {showAuthModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowAuthModal(false)} />
-              <div className="relative w-full max-w-md animate-in zoom-in-95 duration-200">
-                  <button onClick={() => setShowAuthModal(false)} className="absolute -top-12 right-0 text-white/80 hover:text-white">Close <span className="text-2xl ml-1">&times;</span></button>
+              <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={() => setShowAuthModal(false)} />
+              <div className="relative w-full max-w-md animate-in zoom-in-95 duration-200 border-2 border-slate-900 shadow-hard">
+                  <div className="bg-slate-900 text-white px-3 py-2 flex justify-between items-center select-none border-b-2 border-slate-900">
+                      <div className="flex items-center gap-2">
+                          <Lock className="h-3 w-3 text-yellow-400" />
+                          <span className="font-mono text-xs font-bold uppercase tracking-widest">ACCESS_TERMINAL</span>
+                      </div>
+                      <button onClick={() => setShowAuthModal(false)} className="hover:text-red-400"><X className="h-4 w-4"/></button>
+                  </div>
                   <Auth onLoginSuccess={() => { setShowAuthModal(false); checkSession(); }} />
               </div>
           </div>

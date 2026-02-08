@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Coordinates } from '../types';
 import { Button } from './Button';
-import { X, Save, MapPin, Crosshair, Image as ImageIcon, Camera } from 'lucide-react';
+import { X, Save, MapPin, Crosshair, Image as ImageIcon, Camera, UserCog } from 'lucide-react';
 import { uploadImage } from '../services/db';
 
 interface EditProfileModalProps {
@@ -93,46 +93,49 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={onClose} />
       
-      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h3 className="text-lg font-bold text-slate-900">Edit Profile</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="h-5 w-5" />
-          </button>
+      <div className="relative bg-white w-full max-w-lg shadow-hard border-2 border-slate-900 flex flex-col max-h-[90vh]">
+        
+        {/* System Bar */}
+        <div className="bg-slate-900 text-white px-3 py-2 flex justify-between items-center select-none border-b-2 border-slate-900">
+           <div className="flex items-center gap-2">
+             <div className="w-3 h-3 bg-yellow-400 border border-black"></div>
+             <span className="font-mono text-xs font-bold uppercase tracking-widest flex items-center gap-2"><UserCog className="h-3 w-3" /> USER_CONFIG</span>
+           </div>
+           <button onClick={onClose}><X className="h-4 w-4 hover:text-red-400"/></button>
         </div>
 
-        <div className="overflow-y-auto p-6">
+        <div className="overflow-y-auto p-6 bg-slate-50 flex-1 custom-scrollbar">
           <form id="edit-profile-form" onSubmit={handleSubmit} className="space-y-4">
             
             {/* Banner Edit */}
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Banner Image</label>
-                <div className="relative h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 mb-2 group">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-mono">Banner_Image</label>
+                <div className="relative h-24 border-2 border-slate-300 bg-white group hover:border-blue-500 transition-colors">
                     {formData.bannerUrl ? (
-                        <img src={formData.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                        <img src={formData.bannerUrl} alt="Banner" className="w-full h-full object-cover opacity-80" />
                     ) : (
-                        <div className="flex items-center justify-center h-full text-slate-400 text-sm">No banner selected</div>
+                        <div className="flex items-center justify-center h-full text-slate-300 text-xs font-mono">NO_DATA</div>
                     )}
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <label htmlFor="banner-upload" className="cursor-pointer text-white font-medium flex items-center gap-2 hover:underline">
-                            <ImageIcon className="h-4 w-4" /> Change
+                    <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <label htmlFor="banner-upload" className="cursor-pointer text-white font-mono text-xs font-bold flex items-center gap-2 hover:underline">
+                            <ImageIcon className="h-4 w-4" /> UPLOAD
                         </label>
                         <input id="banner-upload" type="file" className="hidden" accept="image/*" onChange={handleBannerUpload} disabled={isUploading} />
                     </div>
                 </div>
             </div>
 
-            {/* Avatar Edit - Added */}
+            {/* Avatar Edit */}
             <div className="flex justify-center -mt-8 mb-4 relative z-10">
                 <div className="relative group">
                     <img 
                         src={formData.avatarUrl || user.avatarUrl} 
                         alt="Avatar" 
-                        className="w-20 h-20 rounded-full border-4 border-white bg-white object-cover shadow-md" 
+                        className="w-20 h-20 bg-white object-cover border-2 border-slate-900 shadow-hard-sm" 
                     />
-                    <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                         <label htmlFor="avatar-upload" className="cursor-pointer text-white">
                             <Camera className="h-6 w-6" />
                         </label>
@@ -142,10 +145,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Display Name</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-mono">Display_ID</label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border-2 border-slate-300 focus:border-blue-600 outline-none font-bold text-sm bg-white"
                 value={formData.displayName}
                 onChange={(e) => setFormData({...formData, displayName: e.target.value})}
                 required
@@ -153,17 +156,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-mono">Geo_Loc</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full pl-9 pr-3 py-2 border-2 border-slate-300 focus:border-blue-600 outline-none text-sm bg-white font-mono"
                     value={formData.location}
                     onChange={(e) => setFormData({...formData, location: e.target.value})}
                     required
-                    placeholder="City, State"
+                    placeholder="CITY, STATE"
                   />
                 </div>
                 <Button 
@@ -171,63 +174,62 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
                   variant="outline" 
                   onClick={handleDetectLocation}
                   disabled={isLocating}
-                  title="Detect GPS Coordinates"
+                  title="Detect GPS"
+                  className="border-2 border-slate-300"
                 >
                   {isLocating ? (
-                    <span className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
+                    <span className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full" />
                   ) : (
-                    <Crosshair className={`h-4 w-4 ${coordinates ? 'text-green-600' : 'text-slate-500'}`} />
+                    <Crosshair className={`h-4 w-4 ${coordinates ? 'text-green-600' : 'text-slate-400'}`} />
                   )}
                 </Button>
               </div>
               {coordinates && (
-                <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500" />
-                  GPS Coordinates set ({coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)})
+                <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1 font-mono">
+                  <span className="inline-block w-1.5 h-1.5 bg-green-500" />
+                  COORDS_LOCKED ({coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)})
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Bio</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-mono">Bio_Data</label>
               <textarea
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 h-24"
+                className="w-full px-3 py-2 border-2 border-slate-300 focus:border-blue-600 outline-none h-24 bg-white text-sm"
                 value={formData.bio}
                 onChange={(e) => setFormData({...formData, bio: e.target.value})}
                 maxLength={200}
               />
-              <p className="text-xs text-slate-400 text-right mt-1">{formData.bio.length}/200</p>
+              <p className="text-[10px] text-slate-400 text-right mt-1 font-mono">{formData.bio.length}/200</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Current Projects</label>
-              <p className="text-xs text-slate-500 mb-2">What are you working on? One per line.</p>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-mono">Active_Projects</label>
               <textarea
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 h-24"
+                className="w-full px-3 py-2 border-2 border-slate-300 focus:border-blue-600 outline-none h-24 bg-white text-sm font-mono"
                 value={formData.projects}
                 onChange={(e) => setFormData({...formData, projects: e.target.value})}
-                placeholder="Building a birdhouse&#10;Learning Spanish"
+                placeholder="PROJECT_ALPHA&#10;PROJECT_BETA"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Hobbies</label>
-              <p className="text-xs text-slate-500 mb-2">Comma separated.</p>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-mono">Interests</label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border-2 border-slate-300 focus:border-blue-600 outline-none text-sm bg-white font-mono"
                 value={formData.hobbies}
                 onChange={(e) => setFormData({...formData, hobbies: e.target.value})}
-                placeholder="Reading, Hiking, Cooking"
+                placeholder="TECH, CODING, ART"
               />
             </div>
           </form>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="edit-profile-form" variant="primary" disabled={isUploading}>
-            <Save className="h-4 w-4 mr-2" /> Save Changes
+        <div className="px-6 py-4 border-t-2 border-slate-900 bg-white flex justify-end gap-3">
+          <Button variant="ghost" onClick={onClose} className="font-mono text-xs font-bold uppercase">Abort</Button>
+          <Button type="submit" form="edit-profile-form" variant="primary" disabled={isUploading} className="font-mono text-xs font-bold uppercase shadow-hard-sm">
+            <Save className="h-4 w-4 mr-2" /> Commit_Changes
           </Button>
         </div>
       </div>
