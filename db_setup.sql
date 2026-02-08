@@ -20,6 +20,7 @@ create table profiles (
   hobbies text[] default '{}',
   coordinates_lat float,
   coordinates_lng float,
+  is_admin boolean default false, -- Admin Flag
   created_at timestamp with time zone default now()
 );
 

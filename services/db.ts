@@ -39,13 +39,14 @@ export const db = {
       badges: [],
       projects: [],
       hobbies: [],
-      coordinates: undefined
+      coordinates: undefined,
+      isAdmin: false
     };
 
     if (sql) {
         await sql`
-            INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies)
-            VALUES (${id}, ${newUser.displayName}, ${newUser.handle}, ${newUser.bio}, ${newUser.avatarUrl}, ${newUser.bannerUrl}, ${newUser.location}, ${newUser.trustScore}, ${JSON.stringify(newUser.badges)}, ${newUser.projects}, ${newUser.hobbies})
+            INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies, is_admin)
+            VALUES (${id}, ${newUser.displayName}, ${newUser.handle}, ${newUser.bio}, ${newUser.avatarUrl}, ${newUser.bannerUrl}, ${newUser.location}, ${newUser.trustScore}, ${JSON.stringify(newUser.badges)}, ${newUser.projects}, ${newUser.hobbies}, ${newUser.isAdmin})
         `;
     } else {
         const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
@@ -74,7 +75,8 @@ export const db = {
                 badges: u.badges || [],
                 projects: u.projects || [],
                 hobbies: u.hobbies || [],
-                coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
+                coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined,
+                isAdmin: u.is_admin
             };
             this.setSession(user.id);
             return user;
@@ -120,7 +122,8 @@ export const db = {
                 badges: u.badges || [],
                 projects: u.projects || [],
                 hobbies: u.hobbies || [],
-                coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
+                coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined,
+                isAdmin: u.is_admin
             };
         } catch (e) {
             console.error("DB Error", e);
@@ -147,7 +150,8 @@ export const db = {
             badges: u.badges || [],
             projects: u.projects || [],
             hobbies: u.hobbies || [],
-            coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
+            coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined,
+            isAdmin: u.is_admin
           }));
       } else {
           const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
