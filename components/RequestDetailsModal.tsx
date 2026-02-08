@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User, DeliveryPreference, Fulfillment } from '../types';
 import { Button } from './Button';
-import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play, ArrowLeft, Package, Clock, ShieldCheck, ShieldAlert, Heart } from 'lucide-react';
+import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play, ArrowLeft, Package, Clock, ShieldCheck, ShieldAlert, Heart, Lock } from 'lucide-react';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
 import { playPcmAudio } from '../utils/audio';
@@ -144,7 +144,7 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
         {viewingFulfillmentUser ? (
             <div className="flex flex-col h-full bg-slate-50">
                 <div className="bg-white p-4 border-b border-slate-200 flex items-center gap-3 shadow-sm sticky top-0 z-10">
-                    <button onClick={() => setViewingFulfillmentUser(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
+                    <button onClick={() => setViewingFulfillmentUser(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <h2 className="font-bold text-lg text-slate-800">Fulfillment Status</h2>
@@ -152,7 +152,7 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                 
                 <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
                     <div className="flex items-center gap-4 mb-6">
-                        <img src={viewingFulfillmentUser.avatarUrl} className="w-16 h-16 rounded-full border-2 border-white shadow-md" alt="" />
+                        <img src={viewingFulfillmentUser.avatarUrl} className="w-16 h-16 rounded-full border-2 border-white shadow-md bg-white" alt="" />
                         <div>
                             <div className="font-bold text-xl text-slate-900">{viewingFulfillmentUser.displayName}</div>
                             <div className="text-sm text-slate-500">@{viewingFulfillmentUser.handle}</div>
@@ -270,7 +270,7 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                         className="flex items-center gap-3 cursor-pointer hover:bg-slate-100 p-2 rounded-xl transition-colors -ml-2"
                         onClick={() => onViewProfile && onViewProfile(requester.id)}
                     >
-                        <img src={requester.avatarUrl} className="w-12 h-12 rounded-full border-2 border-white shadow-md" alt="" />
+                        <img src={requester.avatarUrl} className="w-12 h-12 rounded-full border-2 border-white shadow-md bg-white" alt="" />
                         <div>
                             <div className="font-bold text-slate-800 text-lg">{requester.displayName}</div>
                             <div className="text-xs text-slate-500 flex items-center gap-2">

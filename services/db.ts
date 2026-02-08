@@ -349,6 +349,7 @@ export const db = {
                   id: r.id,
                   threadId: r.thread_id,
                   authorId: r.author_id,
+                  title: r.title,
                   content: r.content,
                   createdAt: r.created_at
               }))
@@ -374,8 +375,8 @@ export const db = {
   async createReply(reply: ForumReply) {
       if (sql) {
           await sql`
-            INSERT INTO forum_replies (id, thread_id, author_id, content, created_at)
-            VALUES (${reply.id}, ${reply.threadId}, ${reply.authorId}, ${reply.content}, ${reply.createdAt})
+            INSERT INTO forum_replies (id, thread_id, author_id, title, content, created_at)
+            VALUES (${reply.id}, ${reply.threadId}, ${reply.authorId}, ${reply.title}, ${reply.content}, ${reply.createdAt})
           `;
       } else {
           const threads = JSON.parse(localStorage.getItem('bm_threads') || '[]') as ForumThread[];

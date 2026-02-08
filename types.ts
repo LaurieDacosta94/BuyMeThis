@@ -124,6 +124,7 @@ export interface ForumReply {
   id: string;
   threadId: string;
   authorId: string;
+  title?: string; // Optional title for the reply
   content: string;
   createdAt: string;
 }

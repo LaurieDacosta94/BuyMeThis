@@ -11,16 +11,12 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
-// Fix: Explicitly extend React.Component to ensure TypeScript correctly infers props and state types
 export class ErrorBoundary extends React.Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-      errorInfo: null
-    };
-  }
+  public state: State = {
+    hasError: false,
+    error: null,
+    errorInfo: null
+  };
 
   public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };

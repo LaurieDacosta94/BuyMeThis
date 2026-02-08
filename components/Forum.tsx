@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ForumThread, ForumReply, ForumCategory, User } from '../types';
 import { Button } from './Button';
@@ -46,7 +47,7 @@ const ForumPost: React.FC<{ author: User | undefined; content: string; date: str
 
                 {/* Body */}
                 <div className="p-6 flex-1 text-slate-800 text-sm leading-relaxed prose prose-slate max-w-none">
-                    {title && <h2 className="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">{title}</h2>}
+                    {title && <h2 className={`text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 ${!isOp ? 'text-lg text-slate-700' : ''}`}>{title}</h2>}
                     <div className="whitespace-pre-wrap font-sans">{content}</div>
                 </div>
 
@@ -72,10 +73,17 @@ export const Forum: React.FC<ForumProps> = ({ currentUser, users, threads, onAdd
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyContent, setReplyContent] = useState('');
+  const [replyTitle, setReplyTitle] = useState('');
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
 
-  const handleSelectThread = (thread: ForumThread) => { setSelectedThread(thread); setActiveView('detail'); setAiSummary(null); window.scrollTo(0,0); };
+  const handleSelectThread = (thread: ForumThread) => { 
+      setSelectedThread(thread); 
+      setReplyTitle(`RE: ${thread.title}`); 
+      setActiveView('detail'); 
+      setAiSummary(null); 
+      window.scrollTo(0,0); 
+  };
   const handleStartThreadClick = () => { if (!currentUser) { onRequireAuth(); return; } setActiveView('create'); };
   
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -89,7 +97,7 @@ export const Forum: React.FC<ForumProps> = ({ currentUser, users, threads, onAdd
   const handleReplySubmit = (e: React.FormEvent) => {
     e.preventDefault(); if (!currentUser) { onRequireAuth(); return; }
     if (!replyContent.trim() || !selectedThread) return;
-    const reply = { id: `rp_${Date.now()}`, threadId: selectedThread.id, authorId: currentUser.id, content: replyContent, createdAt: new Date().toISOString() };
+    const reply = { id: `rp_${Date.now()}`, threadId: selectedThread.id, authorId: currentUser.id, title: replyTitle, content: replyContent, createdAt: new Date().toISOString() };
     onAddReply(reply); setSelectedThread({ ...selectedThread, replies: [...selectedThread.replies, reply] }); setReplyContent('');
   };
 
@@ -133,78 +141,93 @@ export const Forum: React.FC<ForumProps> = ({ currentUser, users, threads, onAdd
 
   if (activeView === 'detail' && selectedThread) {
     return (
-      <div className="max-w-6xl mx-auto min-h-screen pb-12">
-        <div className="mb-6 flex items-center justify-between">
-             <button onClick={() => setActiveView('list')} className="text-slate-500 font-bold text-xs uppercase flex items-center gap-2 hover:text-indigo-600 transition-colors bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm">
-                 <ArrowLeft className="h-4 w-4" /> Return to Index
-             </button>
-             <div className="text-right">
-                 <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedThread.title}</h1>
-                 <div className="text-xs font-mono text-slate-500 mt-1 flex items-center justify-end gap-2">
-                    <span className="bg-slate-200 px-2 py-0.5 rounded text-slate-600 uppercase font-bold text-[10px]">{selectedThread.category}</span>
-                    <span>//</span>
-                    <span>ID: {selectedThread.id}</span>
+      <div className="max-w-7xl mx-auto min-h-screen pb-12">
+        <button onClick={() => setActiveView('list')} className="mb-4 text-xs font-bold uppercase text-slate-500 hover:text-indigo-600 flex items-center gap-2 transition-colors">
+            <ArrowLeft className="h-4 w-4" /> Return to Index
+        </button>
+
+        <div className="bg-white rounded-xl shadow-hard border-2 border-slate-900 overflow-hidden">
+             {/* Header */}
+             <div className="bg-slate-900 text-white px-6 py-4 font-bold text-sm uppercase flex justify-between items-center">
+                 <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 bg-red-500 inline-block animate-pulse rounded-full"></span>
+                    <span>TRANSMISSION_LOG // {selectedThread.id.substring(0,8)}</span>
+                 </div>
+                 <div className="text-xs font-mono text-slate-400">
+                    CHANNEL: {selectedThread.category.toUpperCase()}
                  </div>
              </div>
-        </div>
-        
-        {/* AI Summary Section */}
-        {(selectedThread.content.length > 500 || selectedThread.replies.length > 3) && (
-            <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-lg p-4 shadow-sm">
-                <div className="flex items-start gap-3">
-                    <div className="bg-white p-2 rounded-full shadow-sm text-indigo-500">
-                        <Sparkles className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1">
-                        <h4 className="text-xs font-bold text-indigo-800 uppercase mb-1">AI Synopsis</h4>
-                         {!aiSummary ? (
-                             <button onClick={generateSummary} disabled={isSummarizing} className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline decoration-dotted">
-                                 {isSummarizing ? 'Generating summary...' : 'Generate a quick summary of this discussion'}
-                             </button>
-                         ) : (
-                             <p className="text-xs text-slate-700 leading-relaxed font-medium">{aiSummary}</p>
-                         )}
-                    </div>
-                </div>
-            </div>
-        )}
 
-        {/* OP */}
-        <ForumPost 
-            author={users[selectedThread.authorId]} 
-            title={selectedThread.title} 
-            content={selectedThread.content} 
-            date={selectedThread.createdAt} 
-            isOp={true} 
-        />
-        
-        {/* Replies */}
-        <div className="mt-6 space-y-6">
-            {selectedThread.replies.map((reply) => (
+             <div className="p-6 bg-slate-50">
+                {/* AI Summary Section */}
+                {(selectedThread.content.length > 500 || selectedThread.replies.length > 3) && (
+                    <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-lg p-4 shadow-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="bg-white p-2 rounded-full shadow-sm text-indigo-500">
+                                <Sparkles className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-xs font-bold text-indigo-800 uppercase mb-1">AI Synopsis</h4>
+                                {!aiSummary ? (
+                                    <button onClick={generateSummary} disabled={isSummarizing} className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline decoration-dotted">
+                                        {isSummarizing ? 'Generating summary...' : 'Generate a quick summary of this discussion'}
+                                    </button>
+                                ) : (
+                                    <p className="text-xs text-slate-700 leading-relaxed font-medium">{aiSummary}</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* OP */}
                 <ForumPost 
-                    key={reply.id} 
-                    author={users[reply.authorId]} 
-                    content={reply.content} 
-                    date={reply.createdAt} 
+                    author={users[selectedThread.authorId]} 
+                    title={selectedThread.title} 
+                    content={selectedThread.content} 
+                    date={selectedThread.createdAt} 
+                    isOp={true} 
                 />
-            ))}
-        </div>
-
-        {/* Reply Box */}
-        <div className="mt-8 border border-slate-200 bg-white shadow-sm p-6 rounded-lg">
-            <h4 className="text-xs font-bold uppercase mb-4 text-slate-500 flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Post a Reply</h4>
-            <form onSubmit={handleReplySubmit}>
-                <textarea 
-                    className="w-full border border-slate-200 bg-slate-50 p-4 font-mono text-sm h-32 focus:border-indigo-600 focus:bg-white outline-none rounded transition-colors" 
-                    value={replyContent} 
-                    onChange={(e) => setReplyContent(e.target.value)} 
-                    placeholder={currentUser ? "Add your voice to the discussion..." : "Please log in to reply."} 
-                    disabled={!currentUser} 
-                />
-                <div className="mt-4 flex justify-end">
-                    <Button type="submit" disabled={!replyContent.trim() || !currentUser} className="uppercase px-6">Post Reply</Button>
+                
+                {/* Replies */}
+                <div className="mt-6 space-y-6">
+                    {selectedThread.replies.map((reply) => (
+                        <ForumPost 
+                            key={reply.id} 
+                            author={users[reply.authorId]} 
+                            title={reply.title}
+                            content={reply.content} 
+                            date={reply.createdAt} 
+                        />
+                    ))}
                 </div>
-            </form>
+
+                {/* Reply Box */}
+                <div className="mt-8 border border-slate-200 bg-white shadow-sm p-6 rounded-lg">
+                    <h4 className="text-xs font-bold uppercase mb-4 text-slate-500 flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Post a Reply</h4>
+                    <form onSubmit={handleReplySubmit} className="space-y-3">
+                        <div>
+                            <input 
+                                type="text" 
+                                className="w-full border border-slate-200 bg-slate-50 p-3 text-sm font-bold focus:border-indigo-600 focus:bg-white outline-none rounded transition-colors" 
+                                value={replyTitle} 
+                                onChange={(e) => setReplyTitle(e.target.value)} 
+                                placeholder="Subject (Optional)" 
+                            />
+                        </div>
+                        <textarea 
+                            className="w-full border border-slate-200 bg-slate-50 p-4 font-mono text-sm h-32 focus:border-indigo-600 focus:bg-white outline-none rounded transition-colors" 
+                            value={replyContent} 
+                            onChange={(e) => setReplyContent(e.target.value)} 
+                            placeholder={currentUser ? "Add your voice to the discussion..." : "Please log in to reply."} 
+                            disabled={!currentUser} 
+                        />
+                        <div className="flex justify-end">
+                            <Button type="submit" disabled={!replyContent.trim() || !currentUser} className="uppercase px-6">Post Reply</Button>
+                        </div>
+                    </form>
+                </div>
+             </div>
         </div>
       </div>
     );

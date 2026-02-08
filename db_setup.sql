@@ -68,6 +68,7 @@ create table forum_replies (
   id text primary key,
   thread_id text references forum_threads(id),
   author_id text references profiles(id),
+  title text, -- Added title column
   content text,
   created_at timestamp with time zone
 );
