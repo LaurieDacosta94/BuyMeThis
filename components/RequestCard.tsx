@@ -347,7 +347,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                    ) : (
                      <button type="button" onClick={startRecording} className="text-slate-600 border border-slate-400 hover:text-blue-600 px-1"><Mic className="h-3 w-3" /></button>
                    )}
-                <button type="submit" disabled={!newComment} className="bg-slate-900 text-white text-[10px] px-2 font-mono hover:bg-slate-700 disabled:bg-slate-400">></button>
+                <button type="submit" disabled={!newComment} className="bg-slate-900 text-white text-[10px] px-2 font-mono hover:bg-slate-700 disabled:bg-slate-400">&gt;</button>
               </form>
             </div>
           )}
