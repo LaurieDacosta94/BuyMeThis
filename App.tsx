@@ -479,7 +479,7 @@ const App: React.FC = () => {
   };
 
   if (authLoading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="h-12 w-12 text-indigo-500 animate-spin" /></div>;
-  if (!session || !currentUser) return <Auth onLoginSuccess={() => fetchUserProfile(session?.user?.id)} />;
+  if (!session || !currentUser) return <Auth onLoginSuccess={() => fetchUserProfile(session?.user?.id)} session={session} />;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-12">
