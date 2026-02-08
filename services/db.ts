@@ -1,3 +1,4 @@
+
 import { neon } from '@neondatabase/serverless';
 import { v4 as uuidv4 } from 'uuid';
 import { User, RequestItem, ForumThread, ForumReply, Notification, DeliveryPreference, RequestStatus } from '../types';
@@ -288,11 +289,15 @@ export const db = {
               enrichedData: r.enriched_data,
               candidates: r.candidates || [],
               comments: r.comments || [],
+              fulfillments: r.fulfillments || [],
               coordinates: r.coordinates_lat ? { lat: r.coordinates_lat, lng: r.coordinates_lng } : undefined
           }));
       } else {
           const requests = JSON.parse(localStorage.getItem('bm_requests') || '[]');
-          return requests;
+          return requests.map((r: RequestItem) => ({
+             ...r,
+             fulfillments: r.fulfillments || [] // Ensure array exists for legacy local data
+          }));
       }
   },
 
@@ -301,10 +306,10 @@ export const db = {
           await sql`
             INSERT INTO requests (
                 id, requester_id, title, reason, category, delivery_preference, status, location, created_at, 
-                shipping_address, enriched_data, candidates, comments, coordinates_lat, coordinates_lng
+                shipping_address, enriched_data, candidates, comments, fulfillments, coordinates_lat, coordinates_lng
             ) VALUES (
                 ${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.deliveryPreference}, ${req.status}, ${req.location}, ${req.createdAt},
-                ${req.shippingAddress}, ${JSON.stringify(req.enrichedData)}, ${req.candidates}, ${JSON.stringify(req.comments)}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}
+                ${req.shippingAddress}, ${JSON.stringify(req.enrichedData)}, ${req.candidates}, ${JSON.stringify(req.comments)}, ${JSON.stringify(req.fulfillments)}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}
             )
           `;
       } else {
@@ -316,13 +321,7 @@ export const db = {
 
   async updateRequest(id: string, updates: Partial<RequestItem>) {
       if (sql) {
-          // Construct query dynamically for simplicity in this demo, usually would use a query builder or individual params
-          // Since we are using a simple driver, we handle specific fields
-          const keys = Object.keys(updates);
-          if (keys.length === 0) return;
-
-          // For this specific app scope, we only update specific fields usually
-          // This is a simplified handler
+          // Construct query dynamically for simplicity in this demo
           if (updates.status) await sql`UPDATE requests SET status = ${updates.status} WHERE id = ${id}`;
           if (updates.candidates) await sql`UPDATE requests SET candidates = ${updates.candidates} WHERE id = ${id}`;
           if (updates.fulfillerId) await sql`UPDATE requests SET fulfiller_id = ${updates.fulfillerId} WHERE id = ${id}`;
@@ -332,6 +331,7 @@ export const db = {
           if (updates.thankYouMessage) await sql`UPDATE requests SET thank_you_message = ${updates.thankYouMessage} WHERE id = ${id}`;
           if (updates.receiptVerificationStatus) await sql`UPDATE requests SET receipt_verification_status = ${updates.receiptVerificationStatus} WHERE id = ${id}`;
           if (updates.comments) await sql`UPDATE requests SET comments = ${JSON.stringify(updates.comments)} WHERE id = ${id}`;
+          if (updates.fulfillments) await sql`UPDATE requests SET fulfillments = ${JSON.stringify(updates.fulfillments)} WHERE id = ${id}`;
           if (updates.createdAt) await sql`UPDATE requests SET created_at = ${updates.createdAt} WHERE id = ${id}`;
       } else {
           const requests = JSON.parse(localStorage.getItem('bm_requests') || '[]') as RequestItem[];

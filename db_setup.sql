@@ -1,3 +1,4 @@
+
 -- RESET DATABASE (Drop all existing tables)
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS forum_replies CASCADE;
@@ -47,7 +48,8 @@ create table requests (
   receipt_verification_status text,
   enriched_data jsonb,
   candidates text[] default '{}',
-  comments jsonb default '[]'::jsonb
+  comments jsonb default '[]'::jsonb,
+  fulfillments jsonb default '[]'::jsonb
 );
 
 -- 3. Create Forum Tables

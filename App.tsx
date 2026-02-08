@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar } from './components/Navbar';
 import { RequestCard } from './components/RequestCard';
@@ -15,7 +16,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Hero } from './components/Hero';
 import { Auth } from './components/Auth';
-import { RequestItem, RequestStatus, User, Notification, Category, ForumThread, ForumCategory, ForumReply } from './types';
+import { RequestItem, RequestStatus, User, Notification, Category, ForumThread, ForumCategory, ForumReply, Fulfillment } from './types';
 import { Search, Package, ArrowLeft, Map, List, Loader2, Database, AlertCircle, X, Lock } from 'lucide-react';
 import { db } from './services/db';
 import confetti from 'canvas-confetti';
@@ -255,16 +256,48 @@ const App: React.FC = () => {
     if (!requireAuth()) return;
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
+    if (!req) return;
+
     try {
-        await db.updateRequest(requestId, {
-            status: RequestStatus.FULFILLED, 
-            fulfillerId: currentUser.id, // Set the final fulfiller
+        // Create new fulfillment entry
+        const newFulfillment: Fulfillment = {
+            fulfillerId: currentUser.id,
+            status: RequestStatus.FULFILLED,
             trackingNumber: orderId,
             proofOfPurchaseImage: receiptImage,
             giftMessage: giftMessage,
-            receiptVerificationStatus: verificationStatus
+            receiptVerificationStatus: verificationStatus,
+            createdAt: new Date().toISOString()
+        };
+
+        const existingFulfillments = req.fulfillments || [];
+        // Remove old entry for this user if exists (upsert logic)
+        const updatedFulfillments = [...existingFulfillments.filter(f => f.fulfillerId !== currentUser.id), newFulfillment];
+
+        await db.updateRequest(requestId, {
+            status: RequestStatus.FULFILLED, // Global status shows as fulfilled if at least one person does it
+            fulfillerId: currentUser.id, // Set primary fulfiller to latest for legacy view
+            trackingNumber: orderId, // Legacy
+            proofOfPurchaseImage: receiptImage, // Legacy
+            giftMessage: giftMessage, // Legacy
+            receiptVerificationStatus: verificationStatus, // Legacy
+            fulfillments: updatedFulfillments
         });
-        if (req) createNotification(req.requesterId, `${currentUser.displayName} purchased your item! Order ID: ${orderId}`, 'success', req.id);
+
+        // Notify requester
+        createNotification(req.requesterId, `${currentUser.displayName} purchased your item! Order ID: ${orderId}`, 'success', req.id);
+
+        // Notify other candidates
+        const otherCandidates = (req.candidates || []).filter(cId => cId !== currentUser.id);
+        for (const candidateId of otherCandidates) {
+            createNotification(
+                candidateId, 
+                `Heads up: ${currentUser.displayName} has fulfilled the request "${req.title}". If you have already purchased it, you can still submit your fulfillment details.`, 
+                'alert', 
+                req.id
+            );
+        }
+
         setIsFulfillmentModalOpen(false);
         setActiveRequest(null);
         setDetailsRequest(null);
@@ -278,9 +311,24 @@ const App: React.FC = () => {
     if (!requireAuth()) return;
     if (!currentUser) return;
     const req = requests.find(r => r.id === requestId);
+    if (!req) return;
+
     try {
-        await db.updateRequest(requestId, { trackingNumber });
-        if (req) createNotification(req.requesterId, `Tracking updated for "${req.title}": ${trackingNumber}`, 'info', req.id);
+        // Update specific fulfillment entry
+        const fulfillments = req.fulfillments || [];
+        const myFulfillmentIndex = fulfillments.findIndex(f => f.fulfillerId === currentUser.id);
+        
+        let updatedFulfillments = [...fulfillments];
+        if (myFulfillmentIndex !== -1) {
+            updatedFulfillments[myFulfillmentIndex] = { ...updatedFulfillments[myFulfillmentIndex], trackingNumber };
+        }
+
+        await db.updateRequest(requestId, { 
+            trackingNumber, // Legacy
+            fulfillments: updatedFulfillments
+        });
+
+        if (req) createNotification(req.requesterId, `Tracking updated for "${req.title}" by ${currentUser.displayName}: ${trackingNumber}`, 'info', req.id);
         setIsFulfillmentModalOpen(false);
         setActiveRequest(null);
         fetchRequests();
@@ -297,9 +345,18 @@ const App: React.FC = () => {
     if (!thankYouModalRequest || !currentUser) return;
     try {
       await db.updateRequest(thankYouModalRequest.id, { status: RequestStatus.RECEIVED, thankYouMessage: message });
-      if (thankYouModalRequest.fulfillerId) {
-          createNotification(thankYouModalRequest.fulfillerId, `${currentUser.displayName} received the item and says: "${message}"`, 'success', thankYouModalRequest.id);
+      
+      // Notify all fulfillers
+      const fulfillerIds = thankYouModalRequest.fulfillments?.map(f => f.fulfillerId) || [];
+      // Also include legacy fulfillerId if not in list
+      if (thankYouModalRequest.fulfillerId && !fulfillerIds.includes(thankYouModalRequest.fulfillerId)) {
+          fulfillerIds.push(thankYouModalRequest.fulfillerId);
       }
+
+      fulfillerIds.forEach(fid => {
+           createNotification(fid, `${currentUser.displayName} received the item and says: "${message}"`, 'success', thankYouModalRequest.id);
+      });
+
       if (forumPostData) {
           const newThread: ForumThread = {
               id: `th_${Date.now()}`,
@@ -329,8 +386,15 @@ const App: React.FC = () => {
       if (!currentUser) return;
       const targetRequest = requests.find(r => r.id === requestId);
       if (!targetRequest) return;
+      
       const newComment = { id: `c_${Date.now()}`, userId: currentUser.id, text, createdAt: new Date().toISOString() };
       const updatedComments = [...targetRequest.comments, newComment];
+
+      // Optimistically update details view immediately
+      if (detailsRequest && detailsRequest.id === requestId) {
+          setDetailsRequest({ ...detailsRequest, comments: updatedComments });
+      }
+
       try {
         await db.updateRequest(requestId, { comments: updatedComments });
         if (targetRequest.requesterId !== currentUser.id) {
@@ -542,7 +606,8 @@ const App: React.FC = () => {
                     <RequestCard 
                       key={req.id} 
                       request={req} 
-                      requester={users[req.requesterId]} 
+                      requester={users[req.requesterId]}
+                      usersMap={users} // Pass users map
                       onFulfill={handleOpenFulfillment}
                       onViewProfile={handleViewProfile}
                       onMarkReceived={handleMarkReceived}
@@ -586,12 +651,13 @@ const App: React.FC = () => {
                 </div>
                 <div className="p-6 bg-slate-50">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).length > 0 ? (
-                            requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).map(req => (
+                        {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.candidates.includes(viewingProfileId)).length > 0 ? (
+                            requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.candidates.includes(viewingProfileId)).map(req => (
                                 <RequestCard 
                                     key={req.id} 
                                     request={req} 
-                                    requester={users[req.requesterId]} 
+                                    requester={users[req.requesterId]}
+                                    usersMap={users} 
                                     onFulfill={handleOpenFulfillment} 
                                     onViewProfile={handleViewProfile} 
                                     onMarkReceived={handleMarkReceived} 
@@ -633,7 +699,7 @@ const App: React.FC = () => {
       </div>
 
       {activeRequest && currentUser && <FulfillmentModal isOpen={isFulfillmentModalOpen} onClose={() => { setIsFulfillmentModalOpen(false); setActiveRequest(null); }} request={activeRequest} currentUser={currentUser} onCommit={handleCommit} onConfirmPurchase={handleConfirmPurchase} onUpdateTracking={handleUpdateTracking} />}
-      {detailsRequest && <RequestDetailsModal isOpen={!!detailsRequest} onClose={() => setDetailsRequest(null)} request={detailsRequest} requester={users[detailsRequest.requesterId]} onFulfill={() => handleOpenFulfillment(detailsRequest)} currentUser={currentUser} candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} onDelete={handleDeleteRequest} onAddComment={handleAddComment} />}
+      {detailsRequest && <RequestDetailsModal isOpen={!!detailsRequest} onClose={() => setDetailsRequest(null)} request={detailsRequest} requester={users[detailsRequest.requesterId]} usersMap={users} onFulfill={() => handleOpenFulfillment(detailsRequest)} currentUser={currentUser} candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} onDelete={handleDeleteRequest} onAddComment={handleAddComment} />}
       {thankYouModalRequest && <ThankYouModal isOpen={!!thankYouModalRequest} onClose={() => setThankYouModalRequest(null)} itemTitle={thankYouModalRequest.title} originalReason={thankYouModalRequest.reason} donorName={users[thankYouModalRequest.fulfillerId || '']?.displayName} onSubmit={submitThankYou} />}
       {currentUser && <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} user={currentUser} onSave={handleUpdateUser} />}
       

@@ -77,6 +77,16 @@ export interface Comment {
   createdAt: string;
 }
 
+export interface Fulfillment {
+  fulfillerId: string;
+  status: RequestStatus; // PENDING | FULFILLED
+  trackingNumber?: string;
+  proofOfPurchaseImage?: string;
+  giftMessage?: string;
+  receiptVerificationStatus?: 'verified' | 'warning' | 'pending';
+  createdAt: string;
+}
+
 export interface RequestItem {
   id: string;
   requesterId: string;
@@ -96,8 +106,10 @@ export interface RequestItem {
 
   // Fulfillment Data
   candidates: string[]; // List of user IDs who offered to help
-  fulfillerId?: string; // The specific user who completed/is completing it
-  trackingNumber?: string;
+  fulfillerId?: string; // Primary fulfiller (legacy/display)
+  fulfillments?: Fulfillment[]; // Multi-user fulfillment tracking
+  
+  trackingNumber?: string; // Legacy/Primary
   proofOfPurchaseUrl?: string;
   proofOfPurchaseImage?: string; // Base64 image of receipt
   receiptVerificationStatus?: 'verified' | 'warning' | 'pending';

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User, DeliveryPreference } from '../types';
 import { Button } from './Button';
@@ -10,6 +11,7 @@ import { LinkPreview } from './LinkPreview';
 interface RequestDetailsModalProps {
   request: RequestItem;
   requester: User;
+  usersMap: Record<string, User>; // Added usersMap prop
   isOpen: boolean;
   onClose: () => void;
   onFulfill: () => void;
@@ -20,7 +22,7 @@ interface RequestDetailsModalProps {
 }
 
 export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({ 
-  request, requester, isOpen, onClose, onFulfill, currentUser, candidates, onAddComment, onDelete
+  request, requester, usersMap, isOpen, onClose, onFulfill, currentUser, candidates, onAddComment, onDelete
 }) => {
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
@@ -220,17 +222,24 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                     
                     <div className="space-y-4 mb-6">
                         {request.comments.length > 0 ? (
-                            request.comments.map(comment => (
-                                <div key={comment.id} className="flex gap-3">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${comment.userId === requester.id ? 'bg-cyan-100 text-cyan-600' : 'bg-slate-100 text-slate-500'}`}>
-                                        <span className="text-xs font-bold">{comment.userId === requester.id ? 'OP' : 'U'}</span>
-                                    </div>
-                                    <div className="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
-                                        <p className="text-sm text-slate-700">{comment.text}</p>
-                                        <p className="text-[10px] text-slate-400 mt-1">{timeAgo(comment.createdAt)}</p>
-                                    </div>
-                                </div>
-                            ))
+                            request.comments.map(comment => {
+                                const commenter = usersMap[comment.userId];
+                                const name = commenter ? commenter.displayName : 'Unknown';
+                                return (
+                                  <div key={comment.id} className="flex gap-3">
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${comment.userId === requester.id ? 'bg-cyan-100 text-cyan-600' : 'bg-slate-100 text-slate-500'}`}>
+                                          <span className="text-xs font-bold">{comment.userId === requester.id ? 'OP' : name.charAt(0)}</span>
+                                      </div>
+                                      <div className="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span className="font-bold text-xs text-slate-800">{comment.userId === requester.id ? 'Original Poster' : name}</span>
+                                            <span className="text-[10px] text-slate-400">{timeAgo(comment.createdAt)}</span>
+                                          </div>
+                                          <p className="text-sm text-slate-700">{comment.text}</p>
+                                      </div>
+                                  </div>
+                                );
+                            })
                         ) : (
                             <div className="text-center py-8 bg-slate-100/50 rounded-2xl border border-dashed border-slate-200">
                                 <p className="text-slate-400 text-sm">No comments yet. Be the first!</p>
@@ -268,10 +277,9 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
         
         {/* Footer Actions */}
         <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-5px_20px_rgba(0,0,0,0.02)] z-20">
-             {request.status === RequestStatus.FULFILLED || request.status === RequestStatus.RECEIVED ? (
+             {request.status === RequestStatus.RECEIVED ? (
                  <div className="w-full bg-green-50 text-green-700 py-3 rounded-xl border border-green-200 text-sm font-bold flex items-center justify-center gap-2">
-                     <CheckCircle className="h-5 w-5" /> 
-                     {request.status === RequestStatus.RECEIVED ? 'Item Received' : 'Item Fulfilled'}
+                     <CheckCircle className="h-5 w-5" /> Item Received
                  </div>
              ) : isMyRequest ? (
                 <Button onClick={handleDelete} size="lg" variant="danger" className="w-full rounded-xl">

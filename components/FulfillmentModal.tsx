@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { RequestItem, RequestStatus, User } from '../types';
+import { RequestItem, RequestStatus, User, Fulfillment } from '../types';
 import { Button } from './Button';
 import { Lock, Copy, CheckCircle, ExternalLink, X, Truck, Image as ImageIcon, Search, Sparkles, MapPin, Globe, ShieldAlert, Heart, Smile, Zap, Loader2, HandHelping, UploadCloud, Camera } from 'lucide-react';
 import { findBuyingOptions, findLocalStores, BuyingOption, generateGiftMessage, getSafetyTips, verifyReceipt } from '../services/geminiService';
@@ -17,21 +18,26 @@ interface FulfillmentModalProps {
 export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ 
   request, isOpen, onClose, onCommit, onConfirmPurchase, onUpdateTracking, currentUser
 }) => {
-  const [inputVal, setInputVal] = useState(request.trackingNumber || '');
-  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  // Check if current user has already fulfilled this
+  const myFulfillment = request.fulfillments?.find(f => f.fulfillerId === currentUser.id);
+  const myStatus = myFulfillment?.status;
+  
+  const [inputVal, setInputVal] = useState(myFulfillment?.trackingNumber || '');
+  const [receiptImage, setReceiptImage] = useState<string | null>(myFulfillment?.proofOfPurchaseImage || null);
   const [showAssistant, setShowAssistant] = useState(false);
   const [searchMode, setSearchMode] = useState<'online' | 'local'>('online');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<{ text: string, options: BuyingOption[] } | null>(null);
   const [safetyTips, setSafetyTips] = useState<string[]>([]);
-  const [giftMessage, setGiftMessage] = useState('');
+  const [giftMessage, setGiftMessage] = useState(myFulfillment?.giftMessage || '');
   const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
   const [isVerifyingReceipt, setIsVerifyingReceipt] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{ status: 'verified' | 'warning', reasoning: string } | null>(null);
 
   const isCandidate = request.candidates?.includes(currentUser.id);
-  const isFulfiller = request.fulfillerId === currentUser.id;
-  const isFulfilled = request.status === RequestStatus.FULFILLED;
+  // Is this user the one who is finalizing it?
+  const isFulfiller = request.fulfillerId === currentUser.id || !!myFulfillment; 
+  const isCompletedByMe = myStatus === RequestStatus.FULFILLED;
 
   useEffect(() => {
     if (isOpen) getSafetyTips(request.title, request.location, request.shippingAddress).then(setSafetyTips);
@@ -100,7 +106,7 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
            <div className="absolute top-4 right-4">
                <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors"><X className="w-5 h-5 text-white" /></button>
            </div>
-           <h2 className="text-2xl font-black tracking-tight">{isFulfilled ? 'Update Tracking' : (isCandidate || isFulfiller) ? 'Fulfillment Protocol' : 'Accept Mission'}</h2>
+           <h2 className="text-2xl font-black tracking-tight">{isCompletedByMe ? 'Update Tracking' : (isCandidate || isFulfiller) ? 'Fulfillment Protocol' : 'Accept Mission'}</h2>
            <p className="text-cyan-100 text-sm font-medium mt-1">Make someone's day brighter!</p>
            
            <div className="absolute -bottom-6 left-6 right-6 bg-white rounded-2xl p-4 shadow-lg border border-cyan-50 flex gap-4 items-center">
@@ -195,7 +201,7 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
               </div>
 
               <div className="border-t border-slate-100 pt-4 space-y-5">
-                {isFulfilled ? (
+                {isCompletedByMe ? (
                    <div>
                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Update Tracking ID</label>
                      <input type="text" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100 outline-none text-sm font-mono" value={inputVal} onChange={(e) => setInputVal(e.target.value)} placeholder="Tracking #" />

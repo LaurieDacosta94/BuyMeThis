@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User } from '../types';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
@@ -9,6 +10,7 @@ import { playPcmAudio } from '../utils/audio';
 interface RequestCardProps {
   request: RequestItem;
   requester: User;
+  usersMap: Record<string, User>; // Added usersMap to look up comment authors
   onFulfill: (request: RequestItem) => void;
   onMarkReceived?: (request: RequestItem) => void;
   onViewProfile?: (userId: string) => void;
@@ -22,7 +24,7 @@ interface RequestCardProps {
 }
 
 export const RequestCard: React.FC<RequestCardProps> = ({ 
-  request, requester, onFulfill, onMarkReceived, onViewProfile, onAddComment, currentUser, onRequireAuth, onOpenDetails, onDelete, showDelete, onReactivate
+  request, requester, usersMap, onFulfill, onMarkReceived, onViewProfile, onAddComment, currentUser, onRequireAuth, onOpenDetails, onDelete, showDelete, onReactivate
 }) => {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
@@ -39,11 +41,15 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
 
   const isMyRequest = currentUser && request.requesterId === currentUser.id;
-  const isMyCommitment = currentUser && request.fulfillerId === currentUser.id;
+  // Check if I have an active fulfillment record or am the main fulfiller (legacy)
+  const myFulfillment = currentUser && request.fulfillments?.find(f => f.fulfillerId === currentUser.id);
+  const isMyCommitment = currentUser && (request.fulfillerId === currentUser.id || !!myFulfillment);
+  
   const amICandidate = currentUser && request.candidates?.includes(currentUser.id);
   
   const isReceived = request.status === RequestStatus.RECEIVED;
-  const isFulfilled = request.status === RequestStatus.FULFILLED;
+  // "Fulfilled" globally or if I have personally fulfilled it
+  const isFulfilled = request.status === RequestStatus.FULFILLED || myFulfillment?.status === RequestStatus.FULFILLED;
   
   const isInactive = request.status === RequestStatus.OPEN && (Date.now() - new Date(request.createdAt).getTime() > 30 * 24 * 60 * 60 * 1000);
 
@@ -153,7 +159,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
     >
       {/* Image Header */}
       <div className="relative h-48 overflow-hidden">
-        <div className="absolute inset-0 bg-slate-200 animate-pulse" />
+        <div className="absolute inset-0 bg-slate-200" />
         <img 
           src={request.enrichedData?.imageUrl || `https://picsum.photos/seed/${request.id}/400/200`} 
           alt={request.title} 
@@ -185,7 +191,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                     Completed
                  </div>
              </div>
-        ) : isFulfilled ? (
+        ) : request.status === RequestStatus.FULFILLED ? (
              <div className="absolute inset-0 flex items-center justify-center bg-blue-500/80 backdrop-blur-[2px]">
                  <div className="bg-white text-blue-600 px-4 py-1.5 rounded-full font-bold shadow-lg transform -rotate-3 text-sm">
                     Fulfilled
@@ -265,12 +271,16 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         {showComments && (
             <div className="bg-slate-50 rounded-2xl p-3 mb-3 animate-in fade-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
                 <div className="space-y-2 mb-2 max-h-24 overflow-y-auto custom-scrollbar">
-                    {request.comments.length > 0 ? request.comments.map(c => (
-                        <div key={c.id} className="text-[10px] flex gap-2">
-                            <span className="font-bold text-slate-700 shrink-0">{c.userId === requester.id ? 'OP' : 'User'}</span>
-                            <span className="text-slate-500">{c.text}</span>
-                        </div>
-                    )) : <p className="text-[10px] text-slate-400 italic text-center">No messages yet.</p>}
+                    {request.comments.length > 0 ? request.comments.map(c => {
+                        const commenter = usersMap[c.userId];
+                        const name = commenter ? commenter.displayName : 'Unknown';
+                        return (
+                          <div key={c.id} className="text-[10px] flex gap-2">
+                              <span className="font-bold text-slate-700 shrink-0">{c.userId === requester.id ? 'OP' : name}</span>
+                              <span className="text-slate-500">{c.text}</span>
+                          </div>
+                        );
+                    }) : <p className="text-[10px] text-slate-400 italic text-center">No messages yet.</p>}
                 </div>
                 <form onSubmit={handleCommentSubmit} className="relative">
                     <input 
@@ -304,10 +314,10 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                    <div className="w-full text-center py-2 text-xs font-bold text-slate-400 bg-slate-50 rounded-xl border border-slate-100">Waiting for Heroes</div>
                )
             ) : isMyCommitment ? (
-                isFulfilled ? (
-                    <Button size="sm" variant="outline" onClick={(e) => {e.stopPropagation(); onFulfill(request)}} className="w-full rounded-xl">Update Tracking</Button>
+                myFulfillment?.status === RequestStatus.FULFILLED ? (
+                     <Button size="sm" variant="outline" onClick={(e) => {e.stopPropagation(); onFulfill(request)}} className="w-full rounded-xl border-green-200 text-green-600 bg-green-50">You Fulfilled This</Button>
                 ) : (
-                    <Button size="sm" variant="secondary" onClick={(e) => {e.stopPropagation(); onFulfill(request)}} className="w-full rounded-xl">Finalize</Button>
+                     <Button size="sm" variant="secondary" onClick={(e) => {e.stopPropagation(); onFulfill(request)}} className="w-full rounded-xl">Finalize</Button>
                 )
             ) : amICandidate ? (
                 <Button size="sm" variant="secondary" onClick={(e) => {e.stopPropagation(); onFulfill(request)}} className="w-full rounded-xl border-blue-200 text-blue-600 bg-blue-50">Pending...</Button>
