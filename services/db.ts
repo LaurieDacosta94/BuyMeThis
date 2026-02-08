@@ -92,6 +92,44 @@ export const db = {
       throw new Error("User not found");
   },
 
+  async loginAsAdmin(password: string): Promise<User> {
+      const adminPass = process.env.ADMIN_PASSWORD || 'secret123';
+      if (password !== adminPass) {
+          throw new Error("Invalid admin password");
+      }
+      
+      const adminUser: User = {
+          id: 'admin_master_id',
+          displayName: 'Administrator',
+          handle: 'admin',
+          bio: 'System Administrator',
+          avatarUrl: 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff',
+          bannerUrl: 'https://picsum.photos/seed/admin_banner/1200/400',
+          location: 'System Core',
+          trustScore: 100,
+          badges: [{ id: 'admin', label: 'Admin', icon: 'shield', description: 'System Admin', color: 'bg-red-600' }],
+          projects: [],
+          hobbies: [],
+          isAdmin: true
+      };
+
+      if (sql) {
+          // Upsert admin user to ensure they exist and have is_admin=true
+          await sql`
+            INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies, is_admin)
+            VALUES (${adminUser.id}, ${adminUser.displayName}, ${adminUser.handle}, ${adminUser.bio}, ${adminUser.avatarUrl}, ${adminUser.bannerUrl}, ${adminUser.location}, ${adminUser.trustScore}, ${JSON.stringify(adminUser.badges)}, ${adminUser.projects}, ${adminUser.hobbies}, ${adminUser.isAdmin})
+            ON CONFLICT (id) DO UPDATE SET is_admin = true, handle = 'admin'
+          `;
+      } else {
+          const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
+          users[adminUser.id] = adminUser;
+          localStorage.setItem('bm_users', JSON.stringify(users));
+      }
+      
+      this.setSession(adminUser.id);
+      return adminUser;
+  },
+
   setSession(userId: string) {
       localStorage.setItem('buymethis_session', userId);
   },

@@ -111,7 +111,9 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   const [handle, setHandle] = useState('');
   const [location, setLocation] = useState('');
 
-  const isAdminAttempt = email.toLowerCase() === 'admin';
+  // Check both fields for 'admin' to toggle admin mode UI
+  const isAdminAttempt = email.toLowerCase() === 'admin' || handle.toLowerCase() === 'admin';
+  
   const isSchemaError = error && error.includes('column') && error.includes('does not exist');
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -121,34 +123,8 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
 
     try {
       if (isAdminAttempt) {
-          // Verify Admin Password
-          const adminPass = process.env.ADMIN_PASSWORD;
-          if (password !== adminPass) {
-              throw new Error("Invalid admin password");
-          }
-          
-          // Create ephemeral admin session (or fetch if exists in DB, but simpler to mock for this requirement)
-          const adminUser: UserType = {
-              id: 'admin_master_id',
-              displayName: 'Administrator',
-              handle: 'admin',
-              bio: 'System Administrator',
-              avatarUrl: 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff',
-              location: 'System Core',
-              trustScore: 100,
-              badges: [{ id: 'admin', label: 'Admin', icon: 'shield', description: 'System Admin', color: 'bg-red-600' }],
-              projects: [],
-              hobbies: [],
-              isAdmin: true
-          };
-          
-          // We save to local storage shim for session persistence in this demo
-          // In real neon app, we'd insert this profile if not exists
-          const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
-          users[adminUser.id] = adminUser;
-          localStorage.setItem('bm_users', JSON.stringify(users));
-          
-          db.setSession(adminUser.id);
+          // Use the dedicated DB method for admin login
+          await db.loginAsAdmin(password);
           onLoginSuccess();
           return;
       }
