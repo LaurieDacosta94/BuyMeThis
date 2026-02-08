@@ -1,8 +1,8 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { RequestItem, RequestStatus, User, Category, DeliveryPreference } from '../types';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
-import { MapPin, Volume2, Loader2, StopCircle, Mic, Users, Trash2, MessageCircle, Send, Heart, Play, Pause, ExternalLink, CornerDownRight, Truck, Handshake, Info } from 'lucide-react';
+import { MapPin, Volume2, Loader2, StopCircle, Mic, Users, Trash2, MessageCircle, Send, Heart, Play, Pause, ExternalLink, CornerDownRight, Truck, Handshake, Info, Link as LinkIcon } from 'lucide-react';
 import { Button } from './Button';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { playPcmAudio } from '../utils/audio';
@@ -10,7 +10,7 @@ import { playPcmAudio } from '../utils/audio';
 interface RequestCardProps {
   request: RequestItem;
   requester: User;
-  usersMap: Record<string, User>; // Added usersMap to look up comment authors
+  usersMap: Record<string, User>; 
   onFulfill: (request: RequestItem) => void;
   onMarkReceived?: (request: RequestItem) => void;
   onViewProfile?: (userId: string) => void;
@@ -31,6 +31,9 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [imgError, setImgError] = useState(false);
   
+  // Link Preview State
+  const [linkPreviewImage, setLinkPreviewImage] = useState<string | null>(null);
+  
   // TTS State
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
@@ -41,17 +44,27 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  useEffect(() => {
+    // If request has a productUrl but no enriched image (or if we want to fallback)
+    if (request.productUrl && !linkPreviewImage) {
+        // Attempt to fetch thumbnail from link if needed
+        fetch(`https://api.microlink.io/?url=${encodeURIComponent(request.productUrl)}`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.status === 'success' && json.data.image?.url) {
+                    setLinkPreviewImage(json.data.image.url);
+                }
+            })
+            .catch(() => {});
+    }
+  }, [request.productUrl]);
+
   const isMyRequest = currentUser && request.requesterId === currentUser.id;
-  // Check if I have an active fulfillment record or am the main fulfiller (legacy)
   const myFulfillment = currentUser && request.fulfillments?.find(f => f.fulfillerId === currentUser.id);
   const isMyCommitment = currentUser && (request.fulfillerId === currentUser.id || !!myFulfillment);
-  
   const amICandidate = currentUser && request.candidates?.includes(currentUser.id);
-  
   const isReceived = request.status === RequestStatus.RECEIVED;
-  // "Fulfilled" globally or if I have personally fulfilled it
   const isFulfilled = request.status === RequestStatus.FULFILLED || myFulfillment?.status === RequestStatus.FULFILLED;
-  
   const isInactive = request.status === RequestStatus.OPEN && (Date.now() - new Date(request.createdAt).getTime() > 30 * 24 * 60 * 60 * 1000);
 
   const timeAgo = (dateStr: string) => {
@@ -59,7 +72,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    
     if (minutes < 1) return 'Just now';
     if (minutes < 60) return `${minutes}m`;
     if (hours < 24) return `${hours}h`;
@@ -149,7 +161,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   const stopRecording = () => { if (mediaRecorderRef.current && isRecordingComment) { mediaRecorderRef.current.stop(); setIsRecordingComment(false); } };
   const handleDelete = (e: React.MouseEvent) => { e.stopPropagation(); if (confirm("Delete?") && onDelete) onDelete(request); };
 
-  // Helper to determine fallback gradient based on category
   const getCategoryGradient = (cat: Category) => {
       switch(cat) {
           case Category.ESSENTIALS: return 'bg-gradient-to-br from-red-400 to-orange-500';
@@ -161,28 +172,35 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       }
   };
 
+  // Decide which image to show
+  // If imgError is true, try linkPreviewImage. If not available, fallback.
+  // If no image at all, check linkPreviewImage.
+  const displayImage = (!imgError && request.enrichedData?.imageUrl) 
+        ? request.enrichedData.imageUrl 
+        : (linkPreviewImage || null);
+  
+  const showFallback = !displayImage;
+
   return (
     <div 
         onClick={(e) => {
-             // Prevent card click when clicking interactive elements
              if ((e.target as HTMLElement).closest('button, input, a')) return;
              onOpenDetails && onOpenDetails(request);
         }}
         className={`group bg-white rounded-3xl shadow-glow border border-white/50 overflow-hidden hover:shadow-glow-hover transition-all duration-300 relative flex flex-col h-full ${isInactive ? 'opacity-80 grayscale-[0.5]' : ''}`}
     >
       {/* Image Header */}
-      <div className={`relative h-48 overflow-hidden ${!request.enrichedData?.imageUrl || imgError ? getCategoryGradient(request.category) : 'bg-slate-200'}`}>
-        {!imgError && request.enrichedData?.imageUrl && (
+      <div className={`relative h-48 overflow-hidden ${showFallback ? getCategoryGradient(request.category) : 'bg-slate-200'}`}>
+        {!showFallback && (
             <img 
-            src={request.enrichedData.imageUrl} 
+            src={displayImage!} 
             alt={request.title} 
             onError={() => setImgError(true)}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
         )}
         
-        {/* If no image or error, show category icon overlay */}
-        {(!request.enrichedData?.imageUrl || imgError) && (
+        {showFallback && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white/90">
                 <Info className="w-12 h-12 mb-2 opacity-50" />
                 <span className="font-bold text-lg tracking-widest uppercase opacity-80">{request.category}</span>
@@ -191,7 +209,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
 
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent"></div>
         
-        {/* Top Badges */}
         <div className="absolute top-3 left-3 flex gap-2">
             <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-cyan-700 shadow-sm flex items-center gap-1">
                 <MapPin className="w-3 h-3" /> {request.location.split(',')[0]}
@@ -203,7 +220,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             )}
         </div>
         
-        {/* Delivery Preference Badge */}
         <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
             <div className="bg-slate-900/80 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-white shadow-sm uppercase tracking-wide">
                 {request.category}
@@ -214,7 +230,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             </div>
         </div>
 
-        {/* Status Overlay */}
         {isReceived ? (
              <div className="absolute inset-0 flex items-center justify-center bg-green-500/80 backdrop-blur-[2px]">
                  <div className="bg-white text-green-600 px-4 py-1.5 rounded-full font-bold shadow-lg transform -rotate-3 text-sm">
@@ -263,9 +278,23 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         </p>
 
         {request.productUrl && (
-             <a href={request.productUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 text-[10px] font-bold text-cyan-600 hover:text-cyan-700 mb-4 bg-cyan-50 p-2 rounded-xl w-fit transition-colors">
-                 <ExternalLink className="w-3 h-3" /> Product Link
-             </a>
+             <div className="mb-4">
+                 {/* Webpage Thumbnail / Link Preview */}
+                 <a href={request.productUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="group/link flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100 hover:bg-indigo-50 hover:border-indigo-200 transition-colors no-underline">
+                     <div className="w-10 h-10 bg-slate-200 rounded-lg shrink-0 overflow-hidden">
+                        {linkPreviewImage ? (
+                            <img src={linkPreviewImage} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400"><ExternalLink className="w-4 h-4" /></div>
+                        )}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                         <div className="text-[10px] font-bold text-slate-600 truncate group-hover/link:text-indigo-600">Product Link</div>
+                         <div className="text-[9px] text-slate-400 truncate">{new URL(request.productUrl).hostname}</div>
+                     </div>
+                     <ExternalLink className="w-3 h-3 text-slate-300 group-hover/link:text-indigo-400 mr-1" />
+                 </a>
+             </div>
         )}
 
         <div className="flex items-center justify-between mb-4 border-t border-slate-100 pt-3">
@@ -297,7 +326,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
              )}
         </div>
 
-        {/* Comments Section */}
         {showComments && (
             <div className="bg-slate-50 rounded-2xl p-3 mb-3 animate-in fade-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
                 <div className="space-y-2 mb-2 max-h-24 overflow-y-auto custom-scrollbar">
@@ -331,7 +359,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             </div>
         )}
 
-        {/* Action Button */}
         <div>
             {isMyRequest ? (
                isFulfilled ? (

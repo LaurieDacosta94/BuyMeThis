@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 
 const getAiClient = () => {
@@ -11,7 +12,7 @@ export const enrichRequestData = async (
     productUrl: string, 
     userTitle: string, 
     userReason: string
-): Promise<{ title: string; price: number; description: string; category: string }> => {
+): Promise<{ title: string; price: number; description: string; category: string; imageUrl?: string }> => {
     
     const ai = getAiClient();
     
@@ -28,6 +29,7 @@ export const enrichRequestData = async (
     1. Search for this product online to verify it exists and get its approximate price.
     2. Infer the best category for it.
     3. Write a short description.
+    4. If possible, find a direct URL to the main product image.
     
     Return the result in JSON format.
     `;
@@ -45,7 +47,8 @@ export const enrichRequestData = async (
                         title: { type: Type.STRING },
                         price: { type: Type.NUMBER },
                         description: { type: Type.STRING },
-                        category: { type: Type.STRING }
+                        category: { type: Type.STRING },
+                        imageUrl: { type: Type.STRING, nullable: true }
                     },
                     required: ["title", "price", "description", "category"]
                 }

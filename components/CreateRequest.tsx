@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './Button';
 import { enrichRequestData, validateContent, analyzeImageForRequest, analyzeAudioForRequest, generateRequestImage, getApproximateAddress } from '../services/geminiService';
 import { RequestItem, RequestStatus, User, Coordinates, Category, DeliveryPreference } from '../types';
-import { Sparkles, Link as LinkIcon, Camera, Mic, Wand2, Crosshair, ArrowRight, ArrowLeft, Image as ImageIcon, MapPin } from 'lucide-react';
+import { Sparkles, Link as LinkIcon, Camera, Mic, Wand2, Crosshair, ArrowRight, ArrowLeft, Image as ImageIcon, MapPin, Loader2 } from 'lucide-react';
 
 interface CreateRequestProps {
   currentUser: User;
@@ -33,6 +34,20 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  // Fetch link metadata to get image if URL is provided
+  const fetchLinkImage = async (url: string) => {
+      if (!url) return;
+      try {
+          const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`);
+          const json = await res.json();
+          if (json.status === 'success' && json.data.image?.url) {
+              setUploadedImage(json.data.image.url);
+          }
+      } catch (e) {
+          console.error("Failed to fetch link image", e);
+      }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -102,10 +117,16 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
       if (!safetyCheck.safe) throw new Error("Safety check failed: Content flagged.");
 
       let enriched = { title: formData.title, price: 0, description: "", category: formData.category };
+      
       if (formData.productUrl) {
+          // If URL present, ensure we have an image from it if possible
+          if (!uploadedImage) {
+              await fetchLinkImage(formData.productUrl);
+          }
           const result = await enrichRequestData(formData.productUrl, formData.title, formData.reason);
           enriched = { ...result, category: Object.values(Category).includes(result.category as Category) ? (result.category as Category) : Category.OTHER };
       }
+
       setFormData(prev => ({ ...prev, title: prev.title || enriched.title }));
       setStep(2);
     } catch (err: any) { setError(err.message); } finally { setIsLoading(false); }
@@ -129,7 +150,8 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.shippingAddress || !formData.title) return;
-    const finalImage = uploadedImage || `https://picsum.photos/seed/${Date.now()}/400/300`;
+    // Use uploaded/fetched image or fallback
+    const finalImage = uploadedImage || ""; 
     const newRequest: RequestItem = {
       id: `req_${Date.now()}`,
       requesterId: currentUser.id,
@@ -208,7 +230,19 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Link (Optional)</label>
                   <div className="relative">
                       <LinkIcon className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                      <input type="url" className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none text-sm bg-slate-50 focus:bg-white transition-all" placeholder="https://amazon.com/..." value={formData.productUrl} onChange={(e) => setFormData({...formData, productUrl: e.target.value})} />
+                      <input 
+                        type="url" 
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                        placeholder="https://amazon.com/..." 
+                        value={formData.productUrl} 
+                        onChange={(e) => {
+                            setFormData({...formData, productUrl: e.target.value});
+                            // If user pastes URL and we don't have an image yet, fetch it
+                            if (e.target.value.length > 8 && !uploadedImage) {
+                                fetchLinkImage(e.target.value);
+                            }
+                        }} 
+                      />
                   </div>
                 </div>
 
@@ -217,7 +251,7 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
                   <textarea className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none h-32 text-sm bg-slate-50 focus:bg-white transition-all" placeholder="Why do you need this item? Tell your story..." value={formData.reason} onChange={(e) => setFormData({...formData, reason: e.target.value})} />
                 </div>
                 
-                {!uploadedImage && formData.title && (
+                {!uploadedImage && formData.title && !formData.productUrl && (
                     <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="text-xs text-indigo-600 font-bold hover:text-indigo-800 flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-indigo-50 w-fit">
                         <Wand2 className="h-3 w-3" /> Generate Visualization with AI
                     </button>
@@ -247,7 +281,7 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
         {step === 2 && (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex gap-4 items-center">
-               <img src={uploadedImage || `https://picsum.photos/100`} className="w-16 h-16 object-cover rounded-xl shadow-sm" alt="Preview" />
+               <img src={uploadedImage || `https://picsum.photos/100`} className="w-16 h-16 object-cover rounded-xl shadow-sm" alt="Preview" onError={(e) => (e.target as HTMLImageElement).src = 'https://picsum.photos/100'} />
                <div>
                  <h3 className="font-bold text-slate-900">{formData.title}</h3>
                  <div className="text-xs text-slate-500 mt-1 font-medium">{formData.category} • {formData.deliveryPreference}</div>

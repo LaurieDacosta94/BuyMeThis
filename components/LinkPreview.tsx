@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, Loader2, ImageOff, Link as LinkIcon } from 'lucide-react';
 
@@ -40,16 +41,16 @@ export const LinkPreview = ({ url }: { url: string }) => {
 
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="block group mt-4 no-underline">
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-hard-sm hover:border-indigo-300 hover:bg-white flex flex-col sm:flex-row group-hover:-translate-y-1">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden transition-all duration-300 hover:shadow-md hover:border-indigo-300 hover:bg-white flex flex-col sm:flex-row group-hover:-translate-y-1">
             {data.image?.url && (
                 <div className="w-full sm:w-36 h-36 sm:h-auto shrink-0 relative overflow-hidden bg-slate-200">
-                     <img src={data.image.url} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                     <img src={data.image.url} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 </div>
             )}
             <div className="p-4 flex flex-col justify-center min-w-0 flex-1">
                  <div className="flex items-center gap-2 mb-2">
                     {data.logo?.url ? <img src={data.logo.url} className="w-4 h-4 rounded-full bg-white shadow-sm" alt="" /> : <ExternalLink className="w-3 h-3 text-indigo-500" />}
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{data.publisher || new URL(url).hostname}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{data.publisher || new URL(url).hostname}</span>
                  </div>
                  <h4 className="font-bold text-slate-800 text-sm leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">{data.title || url}</h4>
                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{data.description}</p>
