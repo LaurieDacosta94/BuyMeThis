@@ -203,6 +203,9 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
     e.preventDefault();
     if (!formData.shippingAddress || !formData.title) return;
 
+    // Use a placeholder if no image
+    const finalImage = uploadedImage || `https://picsum.photos/seed/${Date.now()}/400/300`;
+
     const newRequest: RequestItem = {
       id: `req_${Date.now()}`,
       requesterId: currentUser.id,
@@ -219,7 +222,7 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
         title: formData.title,
         price: 0, 
         description: "User requested item",
-        imageUrl: uploadedImage || `https://picsum.photos/seed/${Date.now()}/400/300` 
+        imageUrl: finalImage
       },
       comments: []
     };
