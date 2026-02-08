@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { User, Coordinates } from '../types';
 import { Button } from './Button';
-import { X, Save, MapPin, Crosshair } from 'lucide-react';
+import { X, Save, MapPin, Crosshair, Image as ImageIcon } from 'lucide-react';
+import { uploadImage } from '../services/db';
 
 interface EditProfileModalProps {
   user: User;
@@ -15,12 +16,14 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
     displayName: user.displayName,
     bio: user.bio,
     location: user.location,
+    bannerUrl: user.bannerUrl || '',
     projects: user.projects.join('\n'),
     hobbies: user.hobbies.join(', ')
   });
   
   const [coordinates, setCoordinates] = useState<Coordinates | undefined>(user.coordinates);
   const [isLocating, setIsLocating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -37,9 +40,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
           lat: position.coords.latitude,
           lng: position.coords.longitude
         });
-        // We can't easily reverse geocode to a string without an external API key here,
-        // so we'll just indicate that we have the coordinates.
-        // Optionally, we could assume the user updates the text manually or we keep the old text.
         setIsLocating(false);
       },
       (error) => {
@@ -50,6 +50,18 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
     );
   };
 
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          setIsUploading(true);
+          const base64 = await uploadImage(file);
+          if (base64) {
+              setFormData(prev => ({ ...prev, bannerUrl: base64 }));
+          }
+          setIsUploading(false);
+      }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedUser: User = {
@@ -57,6 +69,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
       displayName: formData.displayName,
       bio: formData.bio,
       location: formData.location,
+      bannerUrl: formData.bannerUrl || undefined,
       coordinates: coordinates,
       projects: formData.projects.split('\n').filter(p => p.trim() !== ''),
       hobbies: formData.hobbies.split(',').map(h => h.trim()).filter(h => h !== '')
@@ -78,6 +91,25 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
 
         <div className="overflow-y-auto p-6">
           <form id="edit-profile-form" onSubmit={handleSubmit} className="space-y-4">
+            
+            {/* Banner Edit */}
+            <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Banner Image</label>
+                <div className="relative h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 mb-2 group">
+                    {formData.bannerUrl ? (
+                        <img src={formData.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-slate-400 text-sm">No banner selected</div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <label htmlFor="banner-upload" className="cursor-pointer text-white font-medium flex items-center gap-2 hover:underline">
+                            <ImageIcon className="h-4 w-4" /> Change
+                        </label>
+                        <input id="banner-upload" type="file" className="hidden" accept="image/*" onChange={handleBannerUpload} disabled={isUploading} />
+                    </div>
+                </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Display Name</label>
               <input
@@ -163,7 +195,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
 
         <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="edit-profile-form" variant="primary">
+          <Button type="submit" form="edit-profile-form" variant="primary" disabled={isUploading}>
             <Save className="h-4 w-4 mr-2" /> Save Changes
           </Button>
         </div>

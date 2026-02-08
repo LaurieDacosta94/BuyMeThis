@@ -6,13 +6,13 @@ DROP TABLE IF EXISTS requests CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
 
 -- 1. Create Profiles Table
--- Since we are not using Supabase Auth, id is just a text or uuid string
 create table profiles (
   id text primary key,
   display_name text,
   handle text,
   bio text,
   avatar_url text,
+  banner_url text, -- New Column
   location text,
   trust_score integer default 50,
   badges jsonb default '[]'::jsonb,
@@ -30,6 +30,7 @@ create table requests (
   title text,
   reason text,
   category text,
+  delivery_preference text, -- New Column
   status text,
   location text,
   created_at timestamp with time zone,

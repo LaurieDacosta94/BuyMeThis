@@ -21,6 +21,12 @@ export enum Category {
   OTHER = 'Other'
 }
 
+export enum DeliveryPreference {
+  SHIPPING = 'Shipping',
+  IN_PERSON = 'In Person',
+  ANY = 'Any Method'
+}
+
 export enum ForumCategory {
   GENERAL = 'General Chat',
   ADVICE = 'Advice & Tips',
@@ -47,6 +53,7 @@ export interface User {
   handle: string;
   bio: string;
   avatarUrl: string;
+  bannerUrl?: string; // New field
   projects: string[]; // "Current Projects"
   hobbies: string[];
   location: string;
@@ -78,6 +85,7 @@ export interface RequestItem {
   shippingAddress: string; // Hidden unless fulfilling
   status: RequestStatus;
   category: Category;
+  deliveryPreference: DeliveryPreference; // New field
   createdAt: string;
   location: string; // City, Country
   coordinates?: Coordinates;

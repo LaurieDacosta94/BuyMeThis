@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { v4 as uuidv4 } from 'uuid';
-import { User, RequestItem, ForumThread, ForumReply, Notification } from '../types';
+import { User, RequestItem, ForumThread, ForumReply, Notification, DeliveryPreference } from '../types';
 
 // Check for database URL
 const dbUrl = process.env.DATABASE_URL || process.env.VITE_DATABASE_URL;
@@ -24,6 +24,7 @@ export const db = {
       handle: profileData.handle || 'newuser',
       bio: profileData.bio || '',
       avatarUrl: profileData.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`,
+      bannerUrl: profileData.bannerUrl || `https://picsum.photos/seed/${id}_banner/1200/400`,
       location: profileData.location || 'Unknown',
       trustScore: 50,
       badges: [],
@@ -33,8 +34,8 @@ export const db = {
     };
 
     await sql`
-        INSERT INTO profiles (id, display_name, handle, bio, avatar_url, location, trust_score, badges, projects, hobbies)
-        VALUES (${id}, ${newUser.displayName}, ${newUser.handle}, ${newUser.bio}, ${newUser.avatarUrl}, ${newUser.location}, ${newUser.trustScore}, ${JSON.stringify(newUser.badges)}, ${newUser.projects}, ${newUser.hobbies})
+        INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies)
+        VALUES (${id}, ${newUser.displayName}, ${newUser.handle}, ${newUser.bio}, ${newUser.avatarUrl}, ${newUser.bannerUrl}, ${newUser.location}, ${newUser.trustScore}, ${JSON.stringify(newUser.badges)}, ${newUser.projects}, ${newUser.hobbies})
     `;
     
     // Auto-login
@@ -54,6 +55,7 @@ export const db = {
               handle: u.handle,
               bio: u.bio,
               avatarUrl: u.avatar_url,
+              bannerUrl: u.banner_url || `https://picsum.photos/seed/${u.id}_banner/1200/400`,
               location: u.location,
               trustScore: u.trust_score,
               badges: u.badges || [],
@@ -91,6 +93,7 @@ export const db = {
             handle: u.handle,
             bio: u.bio,
             avatarUrl: u.avatar_url,
+            bannerUrl: u.banner_url || `https://picsum.photos/seed/${u.id}_banner/1200/400`,
             location: u.location,
             trustScore: u.trust_score,
             badges: u.badges || [],
@@ -114,6 +117,7 @@ export const db = {
             handle: u.handle,
             bio: u.bio,
             avatarUrl: u.avatar_url,
+            bannerUrl: u.banner_url || `https://picsum.photos/seed/${u.id}_banner/1200/400`,
             location: u.location,
             trustScore: u.trust_score,
             badges: u.badges || [],
@@ -134,6 +138,7 @@ export const db = {
           display_name = ${user.displayName},
           bio = ${user.bio},
           location = ${user.location},
+          banner_url = ${user.bannerUrl},
           projects = ${user.projects},
           hobbies = ${user.hobbies},
           coordinates_lat = ${user.coordinates?.lat || null},
@@ -153,6 +158,7 @@ export const db = {
             title: r.title,
             reason: r.reason,
             category: r.category,
+            deliveryPreference: r.delivery_preference || DeliveryPreference.ANY,
             status: r.status,
             location: r.location,
             createdAt: r.created_at,
@@ -179,8 +185,8 @@ export const db = {
       if (!sql) throw new Error("Database not configured");
       // Note: we assume 'candidates' column exists now.
       await sql`
-          INSERT INTO requests (id, requester_id, title, reason, category, status, location, created_at, coordinates_lat, coordinates_lng, shipping_address, enriched_data, candidates)
-          VALUES (${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.status}, ${req.location}, ${req.createdAt}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}, ${req.shippingAddress}, ${JSON.stringify(req.enrichedData)}, ${req.candidates})
+          INSERT INTO requests (id, requester_id, title, reason, category, delivery_preference, status, location, created_at, coordinates_lat, coordinates_lng, shipping_address, enriched_data, candidates)
+          VALUES (${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.deliveryPreference}, ${req.status}, ${req.location}, ${req.createdAt}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}, ${req.shippingAddress}, ${JSON.stringify(req.enrichedData)}, ${req.candidates})
       `;
   },
 

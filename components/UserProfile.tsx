@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { User, RequestItem, RequestStatus } from '../types';
-import { ShieldCheck, MapPin, Briefcase, Heart, Package, Gift, TrendingUp, Quote, Edit2 } from 'lucide-react';
+import { ShieldCheck, MapPin, Briefcase, Heart, Package, Gift, TrendingUp, Quote, Edit2, Camera } from 'lucide-react';
 import { Button } from './Button';
 import { Badge } from './Badge';
 
@@ -20,10 +20,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
     const verifiedReceived = myRequests.filter(r => r.status === RequestStatus.RECEIVED);
     
     // Simple Trust Score Algorithm
-    // Base: 50
-    // +10 per fulfillment
-    // +5 per verified receipt
-    // Cap at 100
     let score = 50 + (myFulfillments.length * 10) + (verifiedReceived.length * 5);
     if (score > 100) score = 100;
 
@@ -41,79 +37,105 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
     };
   }, [user.id, requests]);
 
+  // Default banner fallback
+  const bannerImage = user.bannerUrl || `https://picsum.photos/seed/${user.id}_banner/1200/400`;
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="h-32 bg-gradient-to-r from-indigo-600 to-purple-700 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+      
+      {/* Banner Section */}
+      <div className="h-48 md:h-64 relative group overflow-hidden bg-slate-900">
+        <img 
+            src={bannerImage} 
+            alt="Profile Banner" 
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent"></div>
+        
+        {isCurrentUser && (
+            <button 
+                onClick={onEditProfile}
+                className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100"
+                title="Change Cover Image"
+            >
+                <Camera className="h-5 w-5" />
+            </button>
+        )}
       </div>
       
-      <div className="px-6 pb-6">
-        <div className="relative flex flex-col sm:flex-row justify-between items-end sm:items-end -mt-12 mb-6 gap-4">
-          <div className="flex items-end">
-            <img 
-              src={user.avatarUrl} 
-              alt={user.displayName} 
-              className="h-24 w-24 rounded-full border-4 border-white bg-white object-cover shadow-md z-10"
-            />
-          </div>
-          
-          <div className="flex-1 w-full sm:w-auto flex justify-between items-end pl-0 sm:pl-4">
-             <div>
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                  {user.displayName}
-                  {isCurrentUser && (
-                    <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-md font-medium border border-slate-200">
-                      You
-                    </span>
-                  )}
-                </h2>
-                <div className="flex items-center gap-2 mt-1">
-                   <p className="text-slate-500 text-sm font-medium">@{user.handle}</p>
-                   {/* Badges Row */}
-                   {user.badges.length > 0 && (
-                     <div className="flex gap-1 ml-2">
-                       {user.badges.map(badge => (
-                         <Badge key={badge.id} badge={badge} size="sm" />
-                       ))}
-                     </div>
-                   )}
-                </div>
-             </div>
+      {/* Profile Header Content */}
+      <div className="px-6 pb-6 relative">
+        <div className="flex flex-col md:flex-row gap-6 -mt-16 md:-mt-20 mb-6 relative z-10 items-end">
+            {/* Avatar */}
+            <div className="relative group">
+                <img 
+                    src={user.avatarUrl} 
+                    alt={user.displayName} 
+                    className="h-32 w-32 md:h-40 md:w-40 rounded-full border-4 border-white bg-white object-cover shadow-lg"
+                />
+                {isCurrentUser && (
+                    <div className="absolute inset-0 rounded-full bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={onEditProfile}>
+                        <Edit2 className="h-6 w-6 text-white drop-shadow-md" />
+                    </div>
+                )}
+            </div>
+            
+            {/* Main Info */}
+            <div className="flex-1 pb-2 text-center md:text-left">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-900 md:text-white md:drop-shadow-sm flex items-center justify-center md:justify-start gap-3">
+                            {user.displayName}
+                            {isCurrentUser && (
+                                <span className="bg-white/20 text-white backdrop-blur-md text-xs px-2 py-1 rounded-full border border-white/30 font-medium">
+                                    You
+                                </span>
+                            )}
+                        </h2>
+                        <div className="flex items-center justify-center md:justify-start gap-2 mt-1 text-slate-500 md:text-slate-200">
+                            <p className="font-medium">@{user.handle}</p>
+                            {user.badges.length > 0 && (
+                                <div className="flex gap-1 ml-2">
+                                    {user.badges.map(badge => (
+                                        <Badge key={badge.id} badge={badge} size="sm" />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-             <div className="flex flex-col items-end gap-2">
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold border shadow-sm ${
-                    stats.trustScore >= 90 ? 'bg-teal-50 text-teal-700 border-teal-200' : 
-                    stats.trustScore >= 70 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
-                    'bg-slate-50 text-slate-700 border-slate-200'
-                }`}>
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>{stats.trustScore}% Trust Score</span>
+                    <div className="flex flex-col items-center md:items-end gap-2">
+                        {isCurrentUser && (
+                            <button 
+                                onClick={onEditProfile}
+                                className="md:hidden text-xs text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-full transition-colors mb-2"
+                            >
+                                <Edit2 className="h-3 w-3" /> Edit Profile
+                            </button>
+                        )}
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold border shadow-sm backdrop-blur-md ${
+                            stats.trustScore >= 90 ? 'bg-teal-50/90 text-teal-800 border-teal-200' : 
+                            'bg-white/90 text-indigo-800 border-indigo-100'
+                        }`}>
+                            <ShieldCheck className="w-4 h-4" />
+                            <span>{stats.trustScore}% Trust Score</span>
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-md">
+                            <MapPin className="w-3 h-3" /> {user.location}
+                        </div>
+                    </div>
                 </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="text-xs text-slate-400 flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> {user.location}
-                  </div>
-                  {isCurrentUser && (
-                    <button 
-                      onClick={onEditProfile}
-                      className="text-xs text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded transition-colors"
-                    >
-                      <Edit2 className="h-3 w-3" /> Edit Profile
-                    </button>
-                  )}
-                </div>
-             </div>
-          </div>
+            </div>
         </div>
         
-        <p className="text-slate-700 mb-8 leading-relaxed max-w-3xl">
-          {user.bio}
-        </p>
+        {/* Bio */}
+        <div className="max-w-3xl mb-8 text-center md:text-left">
+            <p className="text-slate-700 leading-relaxed text-lg">{user.bio || "No bio yet."}</p>
+        </div>
 
         {/* Community Impact Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center gap-4">
+          <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
              <div className="p-3 bg-white rounded-lg shadow-sm text-indigo-600">
                <Gift className="h-6 w-6" />
              </div>
@@ -123,7 +145,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
              </div>
           </div>
 
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-center gap-4">
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
              <div className="p-3 bg-white rounded-lg shadow-sm text-slate-600">
                <Package className="h-6 w-6" />
              </div>
@@ -133,7 +155,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
              </div>
           </div>
 
-          <div className="bg-pink-50 rounded-xl p-4 border border-pink-100 flex items-center gap-4">
+          <div className="bg-pink-50 rounded-xl p-4 border border-pink-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
              <div className="p-3 bg-white rounded-lg shadow-sm text-pink-500">
                <TrendingUp className="h-6 w-6" />
              </div>

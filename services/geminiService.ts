@@ -693,3 +693,33 @@ export const verifyReceipt = async (
         return { verified: false, status: 'warning', reasoning: "AI verification failed." };
     }
 };
+
+/**
+ * Converts GPS Coordinates to an approximate address string using Gemini Google Maps grounding.
+ */
+export const getApproximateAddress = async (lat: number, lng: number): Promise<string> => {
+    const ai = getAiClient();
+    try {
+        // We use gemini-2.5-flash which supports Google Maps tool
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `What is the approximate address or location name at latitude ${lat}, longitude ${lng}? Return only the address string, nothing else.`,
+            config: {
+                tools: [{ googleMaps: {} }],
+                toolConfig: {
+                    retrievalConfig: {
+                        latLng: {
+                            latitude: lat,
+                            longitude: lng
+                        }
+                    }
+                }
+            }
+        });
+        
+        return response.text?.trim() || `GPS: ${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+    } catch (error) {
+        console.error("Reverse Geocode Error:", error);
+        return `GPS: ${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+    }
+};

@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Button } from './Button';
-import { enrichRequestData, validateContent, analyzeImageForRequest, analyzeAudioForRequest, generateRequestImage } from '../services/geminiService';
-import { RequestItem, RequestStatus, User, Coordinates, Category } from '../types';
-import { Sparkles, Link as LinkIcon, AlertCircle, Crosshair, ShieldAlert, Camera, Upload, X, Mic, Square, Wand2 } from 'lucide-react';
+import { enrichRequestData, validateContent, analyzeImageForRequest, analyzeAudioForRequest, generateRequestImage, getApproximateAddress } from '../services/geminiService';
+import { RequestItem, RequestStatus, User, Coordinates, Category, DeliveryPreference } from '../types';
+import { Sparkles, Link as LinkIcon, AlertCircle, Crosshair, ShieldAlert, Camera, Upload, X, Mic, Square, Wand2, Truck, Handshake, Globe } from 'lucide-react';
 
 interface CreateRequestProps {
   currentUser: User;
@@ -22,10 +22,12 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
     title: '',
     reason: '',
     shippingAddress: '',
-    category: Category.OTHER
+    category: Category.OTHER,
+    deliveryPreference: DeliveryPreference.ANY
   });
   
   const [coordinates, setCoordinates] = useState<Coordinates | undefined>(currentUser.coordinates);
+  const [locationName, setLocationName] = useState(currentUser.location);
   const [isLocating, setIsLocating] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
 
@@ -195,12 +197,21 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
 
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCoordinates({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-        setIsLocating(false);
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setCoordinates({ lat, lng });
+        
+        // Reverse Geocode
+        try {
+            setLocationName("Locating address...");
+            const address = await getApproximateAddress(lat, lng);
+            setLocationName(address);
+        } catch (e) {
+            setLocationName(`GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        } finally {
+            setIsLocating(false);
+        }
       },
       (error) => {
         console.error("Error getting location", error);
@@ -226,8 +237,9 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
       shippingAddress: formData.shippingAddress,
       status: RequestStatus.OPEN,
       category: formData.category,
+      deliveryPreference: formData.deliveryPreference,
       createdAt: new Date().toISOString(),
-      location: currentUser.location, // Default to user profile location string
+      location: locationName, 
       coordinates: coordinates, // Use detected coords
       enrichedData: {
         title: formData.title,
@@ -347,17 +359,31 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
                 />
                 </div>
                 
-                <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-                <select
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value as Category})}
-                >
-                    {Object.values(Category).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                        <select
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            value={formData.category}
+                            onChange={(e) => setFormData({...formData, category: e.target.value as Category})}
+                        >
+                            {Object.values(Category).map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Delivery Method</label>
+                        <select
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            value={formData.deliveryPreference}
+                            onChange={(e) => setFormData({...formData, deliveryPreference: e.target.value as DeliveryPreference})}
+                        >
+                            <option value={DeliveryPreference.ANY}>Any / Discuss</option>
+                            <option value={DeliveryPreference.SHIPPING}>Shipping Only</option>
+                            <option value={DeliveryPreference.IN_PERSON}>In Person Only</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div>
@@ -389,15 +415,15 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Location Tag</label>
                 <div className="flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-slate-500 text-sm">
+                    <div className="flex-1 px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-slate-500 text-sm truncate">
                     {coordinates ? (
                         <span className="text-green-600 flex items-center gap-1">
-                        <MapPin className="h-4 w-4" /> 
-                        Using GPS Coordinates ({coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)})
+                        <MapPin className="h-4 w-4 shrink-0" /> 
+                        {locationName}
                         </span>
                     ) : (
                         <span className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" /> {currentUser.location} (Default)
+                        <MapPin className="h-4 w-4 shrink-0" /> {currentUser.location} (Default)
                         </span>
                     )}
                     </div>
@@ -439,6 +465,14 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
                )}
                <div>
                  <h3 className="font-semibold text-indigo-900">{formData.title}</h3>
+                 <div className="flex items-center gap-2 text-xs text-indigo-700 mt-1 mb-2">
+                     <span className="bg-indigo-100 px-2 py-0.5 rounded">{formData.category}</span>
+                     <span>•</span>
+                     <span className="flex items-center gap-1">
+                         {formData.deliveryPreference === DeliveryPreference.SHIPPING ? <Truck className="h-3 w-3" /> : formData.deliveryPreference === DeliveryPreference.IN_PERSON ? <Handshake className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+                         {formData.deliveryPreference}
+                     </span>
+                 </div>
                  <p className="text-sm text-indigo-700 line-clamp-2">{formData.reason}</p>
                  {formData.productUrl && (
                     <a href={formData.productUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline mt-1 block">
@@ -449,13 +483,13 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Shipping Address</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Shipping Address / Meetup Details</label>
               <p className="text-xs text-slate-500 mb-2">
                 This is encrypted and only shown to the person who commits to buying this item for you.
               </p>
               <textarea
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 h-24 font-mono text-sm"
-                placeholder="Full Name&#10;Street Address&#10;City, State, Zip"
+                placeholder={formData.deliveryPreference === DeliveryPreference.IN_PERSON ? "Preferred public meetup spot (e.g. Library)" : "Full Name&#10;Street Address&#10;City, State, Zip"}
                 value={formData.shippingAddress}
                 onChange={(e) => setFormData({...formData, shippingAddress: e.target.value})}
                 required

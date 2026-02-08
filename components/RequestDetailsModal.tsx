@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { RequestItem, RequestStatus, User } from '../types';
+import React, { useState, useRef } from 'react';
+import { RequestItem, RequestStatus, User, DeliveryPreference } from '../types';
 import { Button } from './Button';
-import { X, MapPin, Clock, MessageCircle, Send, Heart, Users, CheckCircle, Navigation, ShieldCheck } from 'lucide-react';
+import { X, MapPin, Clock, MessageCircle, Send, Heart, Users, CheckCircle, Navigation, ShieldCheck, Truck, Handshake, Globe, AlertTriangle, Loader2, StopCircle, Mic, Volume2 } from 'lucide-react';
 import { calculateDistance, formatDistance } from '../utils/geo';
+import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
+import { playPcmAudio } from '../utils/audio';
 
 interface RequestDetailsModalProps {
   request: RequestItem;
@@ -12,11 +14,26 @@ interface RequestDetailsModalProps {
   onFulfill: () => void;
   currentUser: User | null;
   candidates: User[]; // Array of full user objects
+  onAddComment?: (requestId: string, text: string) => void;
 }
 
 export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({ 
-  request, requester, isOpen, onClose, onFulfill, currentUser, candidates
+  request, requester, isOpen, onClose, onFulfill, currentUser, candidates, onAddComment
 }) => {
+  const [newComment, setNewComment] = useState('');
+  const [isPostingComment, setIsPostingComment] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  
+  // TTS State
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [audioSource, setAudioSource] = useState<AudioBufferSourceNode | null>(null);
+
+  // Voice Comment State
+  const [isRecordingComment, setIsRecordingComment] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   if (!isOpen) return null;
 
   const timeAgo = (dateStr: string) => {
@@ -36,6 +53,113 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
 
   const isCandidate = currentUser && request.candidates?.includes(currentUser.id);
 
+  // --- Handlers reused from RequestCard ---
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return; // Auth should be handled by caller before opening if required, or simple check here
+
+    if (newComment.trim() && onAddComment) {
+      setIsPostingComment(true);
+      setCommentError(null);
+      
+      try {
+        const safety = await validateContent(newComment);
+        if (!safety.safe) {
+            setCommentError(safety.reason || "This comment was flagged as inappropriate.");
+            setIsPostingComment(false);
+            return;
+        }
+
+        onAddComment(request.id, newComment);
+        setNewComment('');
+      } catch (err) {
+          setCommentError("Failed to post comment.");
+      } finally {
+        setIsPostingComment(false);
+      }
+    }
+  };
+
+  const handlePlayAudio = async () => {
+      if (isPlayingAudio && audioSource) {
+          audioSource.stop();
+          setIsPlayingAudio(false);
+          setAudioSource(null);
+          return;
+      }
+
+      setIsLoadingAudio(true);
+      try {
+          const textToRead = `${request.title}. ${request.reason}`;
+          const audioBase64 = await generateRequestSpeech(textToRead);
+          if (audioBase64) {
+              const source = await playPcmAudio(audioBase64);
+              setAudioSource(source);
+              setIsPlayingAudio(true);
+              
+              source.onended = () => {
+                  setIsPlayingAudio(false);
+                  setAudioSource(null);
+              };
+          }
+      } catch (err) {
+          console.error(err);
+      } finally {
+          setIsLoadingAudio(false);
+      }
+  };
+
+  const startRecording = async () => {
+    if (!currentUser) return;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunksRef.current.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
+            stream.getTracks().forEach(track => track.stop());
+            
+            setIsPostingComment(true);
+            try {
+                 const reader = new FileReader();
+                 reader.readAsDataURL(audioBlob);
+                 reader.onloadend = async () => {
+                     const base64Audio = reader.result as string;
+                     const text = await transcribeAudio(base64Audio);
+                     if (text) {
+                        setNewComment(prev => prev + (prev ? ' ' : '') + text);
+                     }
+                     setIsPostingComment(false);
+                 };
+            } catch (err) {
+                setCommentError("Failed to transcribe audio.");
+                setIsPostingComment(false);
+            }
+        };
+
+        mediaRecorder.start();
+        setIsRecordingComment(true);
+    } catch (err) {
+        setCommentError("Could not access microphone.");
+    }
+  };
+
+  const stopRecording = () => {
+      if (mediaRecorderRef.current && isRecordingComment) {
+          mediaRecorderRef.current.stop();
+          setIsRecordingComment(false);
+      }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
@@ -54,15 +178,19 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
              
              <div className="absolute bottom-6 left-6 right-6 text-white">
-                 <div className="flex items-center gap-2 mb-2">
+                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                      <span className="bg-indigo-600 px-3 py-1 rounded-full text-xs font-bold shadow-sm">{request.category}</span>
+                     <span className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm">
+                        {request.deliveryPreference === DeliveryPreference.SHIPPING ? <Truck className="h-3 w-3" /> : request.deliveryPreference === DeliveryPreference.IN_PERSON ? <Handshake className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+                        {request.deliveryPreference || 'Any Method'}
+                     </span>
                      {distanceInfo && <span className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"><Navigation className="h-3 w-3" /> {distanceInfo}</span>}
                  </div>
                  <h2 className="text-3xl font-bold leading-tight">{request.title}</h2>
              </div>
         </div>
 
-        <div className="p-8 overflow-y-auto">
+        <div className="p-8 overflow-y-auto custom-scrollbar">
              <div className="flex items-start justify-between mb-8">
                  <div className="flex items-center gap-4">
                      <img src={requester.avatarUrl} className="w-14 h-14 rounded-full border-4 border-slate-50 shadow-sm" alt="" />
@@ -80,9 +208,21 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                  </div>
              </div>
 
-             <div className="prose prose-slate max-w-none mb-8">
+             <div className="prose prose-slate max-w-none mb-6">
                  <h3 className="text-lg font-bold text-slate-900 mb-2">Why this is needed</h3>
                  <p className="text-slate-600 leading-relaxed text-lg">{request.reason}</p>
+             </div>
+
+             {/* Audio Player */}
+             <div className="mb-8">
+                <button 
+                    onClick={handlePlayAudio}
+                    className={`text-sm font-bold flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${isPlayingAudio ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+                    disabled={isLoadingAudio}
+                >
+                    {isLoadingAudio ? <Loader2 className="h-4 w-4 animate-spin" /> : isPlayingAudio ? <StopCircle className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    {isLoadingAudio ? 'Loading Audio...' : isPlayingAudio ? 'Stop Listening' : 'Listen to Story'}
+                </button>
              </div>
 
              {/* Candidates List */}
@@ -102,6 +242,75 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                      </div>
                  </div>
              )}
+
+             {/* Comments Section */}
+             <div className="border-t border-slate-200 pt-6 mb-8">
+                 <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                     <MessageCircle className="h-5 w-5 text-slate-400" /> Discussion ({request.comments.length})
+                 </h4>
+                 
+                 <div className="space-y-4 mb-6">
+                    {request.comments.length > 0 ? (
+                        request.comments.map(comment => (
+                            <div key={comment.id} className="flex gap-3 items-start bg-slate-50 p-3 rounded-xl">
+                                <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${comment.userId === requester.id ? 'bg-indigo-400' : 'bg-slate-300'}`}></div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <span className={`text-xs font-bold ${comment.userId === requester.id ? 'text-indigo-700' : 'text-slate-700'}`}>
+                                            {comment.userId === requester.id ? 'Requester' : 'User'}
+                                        </span>
+                                        <span className="text-[10px] text-slate-400">{timeAgo(comment.createdAt)}</span>
+                                    </div>
+                                    <p className="text-sm text-slate-600 leading-relaxed">{comment.text}</p>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-slate-400 italic text-sm">No comments yet. Ask a question about this request.</p>
+                    )}
+                 </div>
+
+                 {/* Comment Input */}
+                 {onAddComment && (
+                     <form onSubmit={handleCommentSubmit} className="relative">
+                        <input 
+                        type="text" 
+                        value={newComment}
+                        onChange={(e) => { setNewComment(e.target.value); setCommentError(null); }}
+                        placeholder={currentUser ? "Ask a question..." : "Log in to comment"}
+                        className={`w-full pl-4 pr-20 py-3 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${commentError ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}
+                        disabled={isPostingComment || isRecordingComment || !currentUser}
+                        />
+                        <div className="absolute right-1.5 top-1.5 flex gap-1">
+                        {isRecordingComment ? (
+                            <button type="button" onClick={stopRecording} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg animate-pulse">
+                                <StopCircle className="h-5 w-5" />
+                            </button>
+                        ) : (
+                            <button type="button" onClick={startRecording} disabled={!currentUser} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50">
+                                <Mic className="h-5 w-5" />
+                            </button>
+                        )}
+                        <button 
+                            type="submit"
+                            disabled={(!newComment.trim() && !isRecordingComment) || isPostingComment || !currentUser}
+                            className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:bg-slate-300 transition-colors shadow-sm"
+                        >
+                            {isPostingComment ? (
+                            <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                            <Send className="h-5 w-5" />
+                            )}
+                        </button>
+                        </div>
+                    </form>
+                 )}
+                 {commentError && (
+                    <div className="text-xs text-red-600 mt-2 flex items-center gap-1 font-medium bg-red-50 px-2 py-1 rounded">
+                        <AlertTriangle className="h-3 w-3" /> {commentError}
+                    </div>
+                )}
+             </div>
 
              <div className="flex flex-col gap-3 sticky bottom-0 bg-white pt-4 border-t border-slate-100 mt-auto">
                  {request.status === RequestStatus.FULFILLED || request.status === RequestStatus.RECEIVED ? (
