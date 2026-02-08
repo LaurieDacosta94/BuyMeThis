@@ -108,7 +108,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, requests, isCurr
                         {isCurrentUser && (
                             <button 
                                 onClick={onEditProfile}
-                                className="md:hidden text-xs text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-full transition-colors mb-2"
+                                className="text-xs text-indigo-600 font-bold hover:text-indigo-800 flex items-center gap-1 bg-white px-4 py-2 rounded-full transition-all shadow-md hover:shadow-lg border border-indigo-50 mb-2"
                             >
                                 <Edit2 className="h-3 w-3" /> Edit Profile
                             </button>

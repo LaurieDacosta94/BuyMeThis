@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { v4 as uuidv4 } from 'uuid';
-import { User, RequestItem, ForumThread, ForumReply, Notification, DeliveryPreference } from '../types';
+import { User, RequestItem, ForumThread, ForumReply, Notification, DeliveryPreference, RequestStatus } from '../types';
 
 // Check for database URL
 const dbUrl = process.env.DATABASE_URL || process.env.VITE_DATABASE_URL;
@@ -9,6 +9,16 @@ const useNeon = !!dbUrl;
 // Initialize Neon client if URL exists
 const sql = useNeon ? neon(dbUrl!) : null;
 
+// Helper to simulate image upload (returns base64)
+export const uploadImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
+
 // --- DB INTERFACE ---
 
 export const db = {
@@ -16,7 +26,6 @@ export const db = {
 
   // --- AUTH ---
   async signUp(email: string, profileData: Partial<User>) {
-    if (!sql) throw new Error("Database not configured. Please connect Neon DB.");
     const id = uuidv4();
     const newUser: User = {
       id,
@@ -33,38 +42,50 @@ export const db = {
       coordinates: undefined
     };
 
-    await sql`
-        INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies)
-        VALUES (${id}, ${newUser.displayName}, ${newUser.handle}, ${newUser.bio}, ${newUser.avatarUrl}, ${newUser.bannerUrl}, ${newUser.location}, ${newUser.trustScore}, ${JSON.stringify(newUser.badges)}, ${newUser.projects}, ${newUser.hobbies})
-    `;
+    if (sql) {
+        await sql`
+            INSERT INTO profiles (id, display_name, handle, bio, avatar_url, banner_url, location, trust_score, badges, projects, hobbies)
+            VALUES (${id}, ${newUser.displayName}, ${newUser.handle}, ${newUser.bio}, ${newUser.avatarUrl}, ${newUser.bannerUrl}, ${newUser.location}, ${newUser.trustScore}, ${JSON.stringify(newUser.badges)}, ${newUser.projects}, ${newUser.hobbies})
+        `;
+    } else {
+        const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
+        users[id] = newUser;
+        localStorage.setItem('bm_users', JSON.stringify(users));
+    }
     
-    // Auto-login
     this.setSession(id);
     return newUser;
   },
 
   async signIn(handleOrEmail: string) {
-      if (!sql) throw new Error("Database not configured. Please connect Neon DB.");
-      const result = await sql`SELECT * FROM profiles WHERE handle = ${handleOrEmail} OR display_name = ${handleOrEmail} LIMIT 1`;
-      if (result.length > 0) {
-          const u = result[0];
-          // Map snake_case to camelCase
-          const user: User = {
-              id: u.id,
-              displayName: u.display_name,
-              handle: u.handle,
-              bio: u.bio,
-              avatarUrl: u.avatar_url,
-              bannerUrl: u.banner_url || `https://picsum.photos/seed/${u.id}_banner/1200/400`,
-              location: u.location,
-              trustScore: u.trust_score,
-              badges: u.badges || [],
-              projects: u.projects || [],
-              hobbies: u.hobbies || [],
-              coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
-          };
-          this.setSession(user.id);
-          return user;
+      if (sql) {
+        const result = await sql`SELECT * FROM profiles WHERE handle = ${handleOrEmail} OR display_name = ${handleOrEmail} LIMIT 1`;
+        if (result.length > 0) {
+            const u = result[0];
+            const user: User = {
+                id: u.id,
+                displayName: u.display_name,
+                handle: u.handle,
+                bio: u.bio,
+                avatarUrl: u.avatar_url,
+                bannerUrl: u.banner_url || `https://picsum.photos/seed/${u.id}_banner/1200/400`,
+                location: u.location,
+                trustScore: u.trust_score,
+                badges: u.badges || [],
+                projects: u.projects || [],
+                hobbies: u.hobbies || [],
+                coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
+            };
+            this.setSession(user.id);
+            return user;
+        }
+      } else {
+          const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
+          const user = Object.values(users).find((u: any) => u.handle === handleOrEmail || u.displayName === handleOrEmail) as User | undefined;
+          if (user) {
+              this.setSession(user.id);
+              return user;
+          }
       }
       throw new Error("User not found");
   },
@@ -82,240 +103,268 @@ export const db = {
   },
 
   async getUser(id: string): Promise<User | null> {
-      if (!sql) return null;
-      try {
-        const result = await sql`SELECT * FROM profiles WHERE id = ${id}`;
-        if (result.length === 0) return null;
-        const u = result[0];
-        return {
-            id: u.id,
-            displayName: u.display_name,
-            handle: u.handle,
-            bio: u.bio,
-            avatarUrl: u.avatar_url,
-            bannerUrl: u.banner_url || `https://picsum.photos/seed/${u.id}_banner/1200/400`,
-            location: u.location,
-            trustScore: u.trust_score,
-            badges: u.badges || [],
-            projects: u.projects || [],
-            hobbies: u.hobbies || [],
-            coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
-        };
-      } catch (e) {
-          console.error("DB Error", e);
-          return null;
+      if (sql) {
+        try {
+            const result = await sql`SELECT * FROM profiles WHERE id = ${id}`;
+            if (result.length === 0) return null;
+            const u = result[0];
+            return {
+                id: u.id,
+                displayName: u.display_name,
+                handle: u.handle,
+                bio: u.bio,
+                avatarUrl: u.avatar_url,
+                bannerUrl: u.banner_url,
+                location: u.location,
+                trustScore: u.trust_score,
+                badges: u.badges || [],
+                projects: u.projects || [],
+                hobbies: u.hobbies || [],
+                coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
+            };
+        } catch (e) {
+            console.error("DB Error", e);
+            return null;
+        }
+      } else {
+          const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
+          return users[id] || null;
       }
   },
 
   async getAllUsers(): Promise<User[]> {
-      if (!sql) return [];
-      try {
-        const result = await sql`SELECT * FROM profiles`;
-        return result.map(u => ({
+      if (sql) {
+          const result = await sql`SELECT * FROM profiles`;
+          return result.map(u => ({
             id: u.id,
             displayName: u.display_name,
             handle: u.handle,
             bio: u.bio,
             avatarUrl: u.avatar_url,
-            bannerUrl: u.banner_url || `https://picsum.photos/seed/${u.id}_banner/1200/400`,
+            bannerUrl: u.banner_url,
             location: u.location,
             trustScore: u.trust_score,
             badges: u.badges || [],
             projects: u.projects || [],
             hobbies: u.hobbies || [],
             coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
-        }));
-      } catch (e) {
-        console.error("DB Error", e);
-        return [];
+          }));
+      } else {
+          const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
+          return Object.values(users);
       }
   },
 
   async updateUser(user: User) {
-      if (!sql) throw new Error("Database not configured");
-      await sql`
-          UPDATE profiles SET 
-          display_name = ${user.displayName},
-          bio = ${user.bio},
-          location = ${user.location},
-          banner_url = ${user.bannerUrl},
-          projects = ${user.projects},
-          hobbies = ${user.hobbies},
-          coordinates_lat = ${user.coordinates?.lat || null},
-          coordinates_lng = ${user.coordinates?.lng || null}
-          WHERE id = ${user.id}
-      `;
+      if (sql) {
+          await sql`
+            UPDATE profiles SET 
+                display_name = ${user.displayName},
+                bio = ${user.bio},
+                location = ${user.location},
+                avatar_url = ${user.avatarUrl},
+                banner_url = ${user.bannerUrl},
+                projects = ${user.projects},
+                hobbies = ${user.hobbies},
+                coordinates_lat = ${user.coordinates?.lat || null},
+                coordinates_lng = ${user.coordinates?.lng || null}
+            WHERE id = ${user.id}
+          `;
+      } else {
+          const users = JSON.parse(localStorage.getItem('bm_users') || '{}');
+          users[user.id] = user;
+          localStorage.setItem('bm_users', JSON.stringify(users));
+      }
   },
 
   // --- REQUESTS ---
+
   async getRequests(): Promise<RequestItem[]> {
-      if (!sql) return [];
-      try {
-        const result = await sql`SELECT * FROM requests ORDER BY created_at DESC`;
-        return result.map(r => ({
-            id: r.id,
-            requesterId: r.requester_id,
-            title: r.title,
-            reason: r.reason,
-            category: r.category,
-            deliveryPreference: r.delivery_preference || DeliveryPreference.ANY,
-            status: r.status,
-            location: r.location,
-            createdAt: r.created_at,
-            coordinates: r.coordinates_lat ? { lat: r.coordinates_lat, lng: r.coordinates_lng } : undefined,
-            shippingAddress: r.shipping_address,
-            fulfillerId: r.fulfiller_id,
-            candidates: r.candidates || [],
-            trackingNumber: r.tracking_number,
-            proofOfPurchaseImage: r.proof_of_purchase_image,
-            giftMessage: r.gift_message,
-            thankYouMessage: r.thank_you_message,
-            receiptVerificationStatus: r.receipt_verification_status,
-            enrichedData: r.enriched_data,
-            comments: r.comments || [],
-            productUrl: r.enriched_data?.productUrl || r.productUrl || '' // Ensure productUrl is fetched if stored
-        }));
-      } catch (e) {
-        console.error("DB Error", e);
-        return [];
+      if (sql) {
+          const result = await sql`SELECT * FROM requests ORDER BY created_at DESC`;
+          return result.map(r => ({
+              id: r.id,
+              requesterId: r.requester_id,
+              title: r.title,
+              reason: r.reason,
+              category: r.category,
+              deliveryPreference: r.delivery_preference,
+              status: r.status,
+              location: r.location,
+              createdAt: r.created_at,
+              shippingAddress: r.shipping_address,
+              fulfillerId: r.fulfiller_id,
+              trackingNumber: r.tracking_number,
+              proofOfPurchaseImage: r.proof_of_purchase_image,
+              giftMessage: r.gift_message,
+              thankYouMessage: r.thank_you_message,
+              receiptVerificationStatus: r.receipt_verification_status,
+              enrichedData: r.enriched_data,
+              candidates: r.candidates || [],
+              comments: r.comments || [],
+              coordinates: r.coordinates_lat ? { lat: r.coordinates_lat, lng: r.coordinates_lng } : undefined
+          }));
+      } else {
+          const requests = JSON.parse(localStorage.getItem('bm_requests') || '[]');
+          return requests;
       }
   },
 
   async createRequest(req: RequestItem) {
-      if (!sql) throw new Error("Database not configured");
-      // Note: we assume 'candidates' column exists now.
-      await sql`
-          INSERT INTO requests (id, requester_id, title, reason, category, delivery_preference, status, location, created_at, coordinates_lat, coordinates_lng, shipping_address, enriched_data, candidates)
-          VALUES (${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.deliveryPreference}, ${req.status}, ${req.location}, ${req.createdAt}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}, ${req.shippingAddress}, ${JSON.stringify({...req.enrichedData, productUrl: req.productUrl})}, ${req.candidates})
-      `;
+      if (sql) {
+          await sql`
+            INSERT INTO requests (
+                id, requester_id, title, reason, category, delivery_preference, status, location, created_at, 
+                shipping_address, enriched_data, candidates, comments, coordinates_lat, coordinates_lng
+            ) VALUES (
+                ${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.deliveryPreference}, ${req.status}, ${req.location}, ${req.createdAt},
+                ${req.shippingAddress}, ${JSON.stringify(req.enrichedData)}, ${req.candidates}, ${JSON.stringify(req.comments)}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}
+            )
+          `;
+      } else {
+          const requests = JSON.parse(localStorage.getItem('bm_requests') || '[]');
+          requests.unshift(req);
+          localStorage.setItem('bm_requests', JSON.stringify(requests));
+      }
   },
 
-  async updateRequest(reqId: string, updates: Partial<RequestItem>) {
-      if (!sql) throw new Error("Database not configured");
-      
-      if (updates.status) await sql`UPDATE requests SET status = ${updates.status} WHERE id = ${reqId}`;
-      if (updates.fulfillerId) await sql`UPDATE requests SET fulfiller_id = ${updates.fulfillerId} WHERE id = ${reqId}`;
-      if (updates.candidates) await sql`UPDATE requests SET candidates = ${updates.candidates} WHERE id = ${reqId}`;
-      if (updates.trackingNumber) await sql`UPDATE requests SET tracking_number = ${updates.trackingNumber} WHERE id = ${reqId}`;
-      if (updates.comments) await sql`UPDATE requests SET comments = ${JSON.stringify(updates.comments)} WHERE id = ${reqId}`;
-      if (updates.proofOfPurchaseImage) await sql`UPDATE requests SET proof_of_purchase_image = ${updates.proofOfPurchaseImage} WHERE id = ${reqId}`;
-      if (updates.thankYouMessage) await sql`UPDATE requests SET thank_you_message = ${updates.thankYouMessage} WHERE id = ${reqId}`;
-      if (updates.giftMessage) await sql`UPDATE requests SET gift_message = ${updates.giftMessage} WHERE id = ${reqId}`;
-      if (updates.receiptVerificationStatus) await sql`UPDATE requests SET receipt_verification_status = ${updates.receiptVerificationStatus} WHERE id = ${reqId}`;
+  async updateRequest(id: string, updates: Partial<RequestItem>) {
+      if (sql) {
+          // Construct query dynamically for simplicity in this demo, usually would use a query builder or individual params
+          // Since we are using a simple driver, we handle specific fields
+          const keys = Object.keys(updates);
+          if (keys.length === 0) return;
+
+          // For this specific app scope, we only update specific fields usually
+          // This is a simplified handler
+          if (updates.status) await sql`UPDATE requests SET status = ${updates.status} WHERE id = ${id}`;
+          if (updates.candidates) await sql`UPDATE requests SET candidates = ${updates.candidates} WHERE id = ${id}`;
+          if (updates.fulfillerId) await sql`UPDATE requests SET fulfiller_id = ${updates.fulfillerId} WHERE id = ${id}`;
+          if (updates.trackingNumber) await sql`UPDATE requests SET tracking_number = ${updates.trackingNumber} WHERE id = ${id}`;
+          if (updates.proofOfPurchaseImage) await sql`UPDATE requests SET proof_of_purchase_image = ${updates.proofOfPurchaseImage} WHERE id = ${id}`;
+          if (updates.giftMessage) await sql`UPDATE requests SET gift_message = ${updates.giftMessage} WHERE id = ${id}`;
+          if (updates.thankYouMessage) await sql`UPDATE requests SET thank_you_message = ${updates.thankYouMessage} WHERE id = ${id}`;
+          if (updates.receiptVerificationStatus) await sql`UPDATE requests SET receipt_verification_status = ${updates.receiptVerificationStatus} WHERE id = ${id}`;
+          if (updates.comments) await sql`UPDATE requests SET comments = ${JSON.stringify(updates.comments)} WHERE id = ${id}`;
+          if (updates.createdAt) await sql`UPDATE requests SET created_at = ${updates.createdAt} WHERE id = ${id}`;
+      } else {
+          const requests = JSON.parse(localStorage.getItem('bm_requests') || '[]') as RequestItem[];
+          const idx = requests.findIndex(r => r.id === id);
+          if (idx !== -1) {
+              requests[idx] = { ...requests[idx], ...updates };
+              localStorage.setItem('bm_requests', JSON.stringify(requests));
+          }
+      }
   },
 
-  async deleteRequest(reqId: string) {
-      if (!sql) throw new Error("Database not configured");
-      await sql`DELETE FROM requests WHERE id = ${reqId}`;
+  async deleteRequest(id: string) {
+      if (sql) {
+          await sql`DELETE FROM requests WHERE id = ${id}`;
+      } else {
+          let requests = JSON.parse(localStorage.getItem('bm_requests') || '[]') as RequestItem[];
+          requests = requests.filter(r => r.id !== id);
+          localStorage.setItem('bm_requests', JSON.stringify(requests));
+      }
   },
 
   // --- FORUM ---
+
   async getThreads(): Promise<ForumThread[]> {
-      if (!sql) return [];
-      try {
-        const threads = await sql`SELECT * FROM forum_threads ORDER BY created_at DESC`;
-        const replies = await sql`SELECT * FROM forum_replies ORDER BY created_at ASC`;
-        
-        return threads.map(t => ({
-            id: t.id,
-            authorId: t.author_id,
-            title: t.title,
-            content: t.content,
-            category: t.category,
-            createdAt: t.created_at,
-            views: t.views,
-            likes: t.likes || [],
-            replies: replies.filter(r => r.thread_id === t.id).map(r => ({
-                id: r.id,
-                threadId: r.thread_id,
-                authorId: r.author_id,
-                content: r.content,
-                createdAt: r.created_at
-            }))
-        }));
-      } catch (e) {
-          console.error("DB Error", e);
-          return [];
+      if (sql) {
+          const threads = await sql`SELECT * FROM forum_threads ORDER BY created_at DESC`;
+          const replies = await sql`SELECT * FROM forum_replies ORDER BY created_at ASC`;
+          
+          return threads.map(t => ({
+              id: t.id,
+              authorId: t.author_id,
+              title: t.title,
+              content: t.content,
+              category: t.category,
+              createdAt: t.created_at,
+              views: t.views,
+              likes: t.likes || [],
+              replies: replies.filter((r: any) => r.thread_id === t.id).map((r: any) => ({
+                  id: r.id,
+                  threadId: r.thread_id,
+                  authorId: r.author_id,
+                  content: r.content,
+                  createdAt: r.created_at
+              }))
+          }));
+      } else {
+          return JSON.parse(localStorage.getItem('bm_threads') || '[]');
       }
   },
 
   async createThread(thread: ForumThread) {
-       if (!sql) throw new Error("Database not configured");
-       // Fix: Using simple string for empty array literal or relying on driver to handle empty array
-       await sql`
-         INSERT INTO forum_threads (id, author_id, title, content, category, created_at, views, likes)
-         VALUES (${thread.id}, ${thread.authorId}, ${thread.title}, ${thread.content}, ${thread.category}, ${thread.createdAt}, 0, ${[]})
-       `;
+      if (sql) {
+          await sql`
+            INSERT INTO forum_threads (id, author_id, title, content, category, created_at, views, likes)
+            VALUES (${thread.id}, ${thread.authorId}, ${thread.title}, ${thread.content}, ${thread.category}, ${thread.createdAt}, ${thread.views}, ${thread.likes})
+          `;
+      } else {
+          const threads = JSON.parse(localStorage.getItem('bm_threads') || '[]');
+          threads.unshift(thread);
+          localStorage.setItem('bm_threads', JSON.stringify(threads));
+      }
   },
 
   async createReply(reply: ForumReply) {
-      if (!sql) throw new Error("Database not configured");
-      await sql`
-        INSERT INTO forum_replies (id, thread_id, author_id, content, created_at)
-        VALUES (${reply.id}, ${reply.threadId}, ${reply.authorId}, ${reply.content}, ${reply.createdAt})
-      `;
+      if (sql) {
+          await sql`
+            INSERT INTO forum_replies (id, thread_id, author_id, content, created_at)
+            VALUES (${reply.id}, ${reply.threadId}, ${reply.authorId}, ${reply.content}, ${reply.createdAt})
+          `;
+      } else {
+          const threads = JSON.parse(localStorage.getItem('bm_threads') || '[]') as ForumThread[];
+          const thread = threads.find(t => t.id === reply.threadId);
+          if (thread) {
+              thread.replies.push(reply);
+              localStorage.setItem('bm_threads', JSON.stringify(threads));
+          }
+      }
   },
 
   // --- NOTIFICATIONS ---
+
   async getNotifications(userId: string): Promise<Notification[]> {
-      if (!sql) return [];
-      try {
-        const result = await sql`SELECT * FROM notifications WHERE user_id = ${userId} ORDER BY created_at DESC`;
-        return result.map(n => ({
-            id: n.id,
-            userId: n.user_id,
-            message: n.message,
-            type: n.type,
-            isRead: n.is_read,
-            createdAt: n.created_at,
-            relatedRequestId: n.related_request_id
-        }));
-      } catch (e) {
-          console.error("DB Error", e);
-          return [];
+      if (sql) {
+          const res = await sql`SELECT * FROM notifications WHERE user_id = ${userId} ORDER BY created_at DESC`;
+          return res.map(n => ({
+              id: n.id,
+              userId: n.user_id,
+              message: n.message,
+              type: n.type,
+              isRead: n.is_read,
+              createdAt: n.created_at,
+              relatedRequestId: n.related_request_id
+          }));
+      } else {
+          const all = JSON.parse(localStorage.getItem('bm_notifications') || '[]') as Notification[];
+          return all.filter(n => n.userId === userId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
   },
 
   async createNotification(notif: Notification) {
-      if (!sql) return; 
-      try {
-        await sql`
+      if (sql) {
+          await sql`
             INSERT INTO notifications (id, user_id, message, type, is_read, created_at, related_request_id)
             VALUES (${notif.id}, ${notif.userId}, ${notif.message}, ${notif.type}, ${notif.isRead}, ${notif.createdAt}, ${notif.relatedRequestId})
-        `;
-      } catch(e) { console.error("Notif Error", e); }
+          `;
+      } else {
+          const all = JSON.parse(localStorage.getItem('bm_notifications') || '[]');
+          all.unshift(notif);
+          localStorage.setItem('bm_notifications', JSON.stringify(all));
+      }
   },
-  
+
   async markNotificationsRead(userId: string) {
-       if (!sql) return;
-       await sql`UPDATE notifications SET is_read = true WHERE user_id = ${userId}`;
+      if (sql) {
+          await sql`UPDATE notifications SET is_read = true WHERE user_id = ${userId}`;
+      } else {
+          const all = JSON.parse(localStorage.getItem('bm_notifications') || '[]') as Notification[];
+          const updated = all.map(n => n.userId === userId ? { ...n, isRead: true } : n);
+          localStorage.setItem('bm_notifications', JSON.stringify(updated));
+      }
   }
-};
-
-/**
- * Helper to upload images. 
- * Since Neon is just a DB, we will store the image as Base64.
- * In a real app, you would use AWS S3, Google Cloud Storage, or Vercel Blob.
- */
-export const uploadImage = async (file: File): Promise<string | null> => {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            resolve(reader.result as string);
-        };
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-    });
-};
-
-export const base64ToFile = (base64: string, filename: string): File => {
-  const arr = base64.split(',');
-  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-  return new File([u8arr], filename, { type: mime });
 };

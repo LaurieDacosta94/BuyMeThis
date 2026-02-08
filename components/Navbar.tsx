@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Gift, PlusCircle, Globe, Bell, ChevronDown, User as UserIcon, LogOut, Trophy, MessageSquare, LogIn, Menu, X } from 'lucide-react';
+import { Gift, PlusCircle, Globe, Bell, ChevronDown, User as UserIcon, LogOut, Trophy, MessageSquare, LogIn, Menu, X, Shield } from 'lucide-react';
 import { User, Notification } from '../types';
 
 interface NavbarProps {
@@ -163,6 +163,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </div>
                         
                         <div className="py-2">
+                            {user.isAdmin && (
+                                <button 
+                                onClick={() => { onNavigate('admin'); setActiveMenu('none'); }}
+                                className="w-full text-left px-5 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-3 font-medium transition-colors border-b border-slate-50"
+                                >
+                                <Shield className="h-4 w-4" /> Admin Panel
+                                </button>
+                            )}
+
                             <button 
                             onClick={() => { onNavigate('profile'); setActiveMenu('none'); }}
                             className="w-full text-left px-5 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-3 font-medium transition-colors"
@@ -213,6 +222,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <button onClick={() => { onNavigate('leaderboard'); setActiveMenu('none'); }} className="p-3 rounded-lg hover:bg-slate-50 text-left font-medium text-slate-700 flex items-center gap-3">
                         <Trophy className="h-5 w-5 text-indigo-500" /> Leaderboard
                     </button>
+                    {user?.isAdmin && (
+                        <button onClick={() => { onNavigate('admin'); setActiveMenu('none'); }} className="p-3 rounded-lg hover:bg-slate-50 text-left font-medium text-purple-700 flex items-center gap-3">
+                            <Shield className="h-5 w-5 text-purple-500" /> Admin
+                        </button>
+                    )}
                     <button onClick={() => { onNavigate('create'); setActiveMenu('none'); }} className="p-3 rounded-lg bg-indigo-50 text-indigo-700 text-left font-bold flex items-center gap-3 mt-2">
                         <PlusCircle className="h-5 w-5" /> Request Item
                     </button>

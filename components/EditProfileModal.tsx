@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Coordinates } from '../types';
 import { Button } from './Button';
-import { X, Save, MapPin, Crosshair, Image as ImageIcon } from 'lucide-react';
+import { X, Save, MapPin, Crosshair, Image as ImageIcon, Camera } from 'lucide-react';
 import { uploadImage } from '../services/db';
 
 interface EditProfileModalProps {
@@ -17,6 +17,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
     bio: user.bio,
     location: user.location,
     bannerUrl: user.bannerUrl || '',
+    avatarUrl: user.avatarUrl || '',
     projects: user.projects.join('\n'),
     hobbies: user.hobbies.join(', ')
   });
@@ -62,6 +63,18 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
       }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          setIsUploading(true);
+          const base64 = await uploadImage(file);
+          if (base64) {
+              setFormData(prev => ({ ...prev, avatarUrl: base64 }));
+          }
+          setIsUploading(false);
+      }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedUser: User = {
@@ -70,6 +83,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
       bio: formData.bio,
       location: formData.location,
       bannerUrl: formData.bannerUrl || undefined,
+      avatarUrl: formData.avatarUrl,
       coordinates: coordinates,
       projects: formData.projects.split('\n').filter(p => p.trim() !== ''),
       hobbies: formData.hobbies.split(',').map(h => h.trim()).filter(h => h !== '')
@@ -106,6 +120,23 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, isOpen
                             <ImageIcon className="h-4 w-4" /> Change
                         </label>
                         <input id="banner-upload" type="file" className="hidden" accept="image/*" onChange={handleBannerUpload} disabled={isUploading} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Avatar Edit - Added */}
+            <div className="flex justify-center -mt-8 mb-4 relative z-10">
+                <div className="relative group">
+                    <img 
+                        src={formData.avatarUrl || user.avatarUrl} 
+                        alt="Avatar" 
+                        className="w-20 h-20 rounded-full border-4 border-white bg-white object-cover shadow-md" 
+                    />
+                    <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                        <label htmlFor="avatar-upload" className="cursor-pointer text-white">
+                            <Camera className="h-6 w-6" />
+                        </label>
+                        <input id="avatar-upload" type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={isUploading} />
                     </div>
                 </div>
             </div>

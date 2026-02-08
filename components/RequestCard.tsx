@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User } from '../types';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
-import { MapPin, Clock, ArrowRight, PackageCheck, Truck, Quote, FileCheck, Navigation, MessageCircle, Send, AlertTriangle, Heart, Volume2, Loader2, StopCircle, Mic, ShieldCheck, Users, Trash2 } from 'lucide-react';
+import { MapPin, Clock, ArrowRight, PackageCheck, Truck, Quote, FileCheck, Navigation, MessageCircle, Send, AlertTriangle, Heart, Volume2, Loader2, StopCircle, Mic, ShieldCheck, Users, Trash2, RefreshCw, AlertOctagon } from 'lucide-react';
 import { Button } from './Button';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { playPcmAudio } from '../utils/audio';
@@ -18,10 +18,12 @@ interface RequestCardProps {
   onRequireAuth: () => void;
   onOpenDetails?: (request: RequestItem) => void;
   onDelete?: (request: RequestItem) => void;
+  showDelete?: boolean;
+  onReactivate?: (request: RequestItem) => void;
 }
 
 export const RequestCard: React.FC<RequestCardProps> = ({ 
-  request, requester, onFulfill, onMarkReceived, onViewProfile, onAddComment, currentUser, onRequireAuth, onOpenDetails, onDelete
+  request, requester, onFulfill, onMarkReceived, onViewProfile, onAddComment, currentUser, onRequireAuth, onOpenDetails, onDelete, showDelete, onReactivate
 }) => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -47,6 +49,9 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   const isFulfilled = request.status === RequestStatus.FULFILLED;
   
   const isVerifiedPurchase = request.receiptVerificationStatus === 'verified';
+
+  // Inactive logic: 30 days
+  const isInactive = request.status === RequestStatus.OPEN && (Date.now() - new Date(request.createdAt).getTime() > 30 * 24 * 60 * 60 * 1000);
 
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -205,27 +210,21 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       }
   };
 
+  const handleReactivate = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onReactivate) onReactivate(request);
+  };
+
   return (
     <div 
         onClick={handleCardClick}
-        className={`group bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col hover:-translate-y-1 h-full cursor-pointer relative`}
+        className={`group bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col hover:-translate-y-1 h-full cursor-pointer relative ${isInactive ? 'opacity-80' : ''}`}
     >
-      {/* Delete Button for Owner */}
-      {isMyRequest && !isFulfilled && !isReceived && (
-          <button 
-            onClick={handleDelete}
-            className="absolute top-4 right-4 z-20 p-2 bg-white/90 rounded-full shadow-sm text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            title="Delete Request"
-          >
-              <Trash2 className="h-4 w-4" />
-          </button>
-      )}
-
       <div className="relative h-56 overflow-hidden bg-slate-100">
         <img 
           src={request.enrichedData?.imageUrl || `https://picsum.photos/seed/${request.id}/400/200`} 
           alt={request.title} 
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${isInactive ? 'grayscale' : ''}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60"></div>
         
@@ -235,9 +234,22 @@ export const RequestCard: React.FC<RequestCardProps> = ({
              {request.location}
            </div>
            
-           <span className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-indigo-600 shadow-sm mr-8">
-             {request.category}
-           </span>
+           <div className="flex items-center gap-2">
+                <span className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-indigo-600 shadow-sm">
+                    {request.category}
+                </span>
+                
+                {/* Small Delete Button (Only on profile) */}
+                {showDelete && !isFulfilled && !isReceived && (
+                    <button 
+                        onClick={handleDelete}
+                        className="p-2 bg-white/90 rounded-full shadow-sm text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Delete Request"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </button>
+                )}
+           </div>
         </div>
 
         {distanceInfo && (
@@ -261,6 +273,19 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                {isVerifiedPurchase ? 'VERIFIED PURCHASE' : 'PURCHASED'}
             </span>
           </div>
+        ) : isInactive ? (
+            <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center backdrop-blur-[2px]">
+                <div className="text-center">
+                    <span className="bg-slate-200 text-slate-600 px-4 py-2 rounded-full text-sm font-bold shadow-lg flex items-center gap-2 mb-2 justify-center">
+                        <AlertOctagon className="h-5 w-5" /> INACTIVE
+                    </span>
+                    {isMyRequest && (
+                         <button onClick={handleReactivate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                             <RefreshCw className="h-3 w-3" /> Reactivate Post
+                         </button>
+                    )}
+                </div>
+            </div>
         ) : null}
       </div>
 
@@ -461,14 +486,25 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                   <div className="w-full bg-green-50 text-green-700 font-bold py-2.5 rounded-xl text-center flex items-center justify-center text-sm border border-green-200">
                     <PackageCheck className="h-4 w-4 mr-2" /> Item Received
                   </div>
+               ) : isInactive ? (
+                   /* Inactive state handled by overlay but we can disable buttons here too */
+                   <div className="w-full text-center text-xs text-slate-400 italic">Inactive Post</div>
                ) : (
                   <div className="w-full flex items-center justify-between gap-2">
                       <div className="flex-1 bg-slate-100 text-slate-500 font-medium py-2.5 rounded-xl text-center text-sm border border-slate-200">
                         Request Open
                       </div>
-                      <Button onClick={handleDelete} variant="danger" size="sm" className="rounded-xl px-4 py-2.5 bg-red-100 text-red-600 border border-red-200 hover:bg-red-200 shadow-none">
-                          Delete
-                      </Button>
+                      {/* Large Delete Button - only if showDelete is true (profile) or explicit delete allowed, 
+                          but typically we only show delete on profile or detail. 
+                          If this is the main feed, maybe hide delete? 
+                          User requirement: "Delete buttons should be only seen from the user profile page."
+                          So we hide this large button unless showDelete is true.
+                      */}
+                      {showDelete && (
+                        <Button onClick={handleDelete} size="sm" className="rounded-xl px-4 py-2.5 bg-red-600 text-white border border-red-700 hover:bg-red-700 shadow-none font-bold">
+                            Delete
+                        </Button>
+                      )}
                   </div>
                )
              ) : isMyCommitment ? (
@@ -515,6 +551,10 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                      >
                         Confirm
                      </Button>
+                 </div>
+               ) : isInactive ? (
+                 <div className="w-full bg-slate-100 text-slate-400 font-bold py-2.5 rounded-xl text-center text-sm border border-slate-200">
+                    Inactive
                  </div>
                ) : (
                  <Button 

@@ -11,6 +11,7 @@ import { RequestMap } from './components/RequestMap';
 import { RecommendedRequests } from './components/RecommendedRequests';
 import { Leaderboard } from './components/Leaderboard';
 import { Forum } from './components/Forum';
+import { AdminPanel } from './components/AdminPanel';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Hero } from './components/Hero';
 import { Auth } from './components/Auth';
@@ -166,11 +167,14 @@ const App: React.FC = () => {
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
-    if (!currentUser) return;
+    // Admins can update any user, normally logic handled in db.ts but for UI:
+    const targetId = updatedUser.id;
     try {
         await db.updateUser(updatedUser);
-        setCurrentUser(updatedUser);
-        setUsers(prev => ({ ...prev, [updatedUser.id]: updatedUser }));
+        if (currentUser && currentUser.id === targetId) {
+             setCurrentUser(updatedUser);
+        }
+        setUsers(prev => ({ ...prev, [targetId]: updatedUser }));
         setIsEditProfileOpen(false);
         showToast("Profile updated successfully!");
     } catch (e) { showToast("Failed to update profile", "error"); }
@@ -190,7 +194,7 @@ const App: React.FC = () => {
 
   const handleDeleteRequest = async (request: RequestItem) => {
       if (!requireAuth()) return;
-      if (request.requesterId !== currentUser?.id) {
+      if (request.requesterId !== currentUser?.id && !currentUser?.isAdmin) {
           showToast("You can only delete your own requests", 'error');
           return;
       }
@@ -201,6 +205,23 @@ const App: React.FC = () => {
           showToast("Request deleted successfully");
       } catch (e) {
           showToast("Failed to delete request", 'error');
+      }
+  };
+
+  const handleReactivateRequest = async (request: RequestItem) => {
+      if (!requireAuth()) return;
+      if (request.requesterId !== currentUser?.id) return;
+      
+      try {
+          // Update createdAt to now to refresh freshness
+          await db.updateRequest(request.id, { 
+              createdAt: new Date().toISOString(),
+              status: RequestStatus.OPEN
+          });
+          fetchRequests();
+          showToast("Request reactivated and bumped to top!");
+      } catch (e) {
+          showToast("Failed to reactivate request", 'error');
       }
   };
 
@@ -388,6 +409,12 @@ const App: React.FC = () => {
         setShowAuthModal(true);
         return;
     }
+    // Admin route protection
+    if (view === 'admin' && !currentUser?.isAdmin) {
+        showToast("Unauthorized access", "error");
+        return;
+    }
+    
     setCurrentView(view);
     setViewingProfileId(view === 'profile' && currentUser ? currentUser.id : null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -400,7 +427,16 @@ const App: React.FC = () => {
   };
 
   const sortedRequests = useMemo(() => {
+      // Logic for inactive requests: > 30 days
+      // Filter out inactive requests unless we are viewing a profile
+      const isProfileView = currentView === 'profile';
+      
       let filtered = requests.filter(r => {
+          const isInactive = r.status === RequestStatus.OPEN && (Date.now() - new Date(r.createdAt).getTime() > 30 * 24 * 60 * 60 * 1000);
+          
+          // If inactive, only show if viewing specific profile or user is requester (in future "My Requests" view)
+          if (isInactive && !isProfileView) return false;
+
           const matchesSearch = r.title.toLowerCase().includes(searchTerm.toLowerCase()) || r.reason.toLowerCase().includes(searchTerm.toLowerCase());
           const matchesCategory = categoryFilter === 'All' || r.category === categoryFilter;
           return matchesSearch && matchesCategory;
@@ -423,7 +459,7 @@ const App: React.FC = () => {
           filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
       return filtered;
-  }, [requests, currentUser?.coordinates, searchTerm, categoryFilter]);
+  }, [requests, currentUser?.coordinates, searchTerm, categoryFilter, currentView]);
 
   if (authLoading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="h-12 w-12 text-indigo-600 animate-spin" /></div>;
 
@@ -438,19 +474,21 @@ const App: React.FC = () => {
           </div>
       )}
 
-      <Navbar 
-        currentView={currentView}
-        onNavigate={handleNavigate}
-        user={currentUser}
-        allUsers={Object.values(users)} 
-        onSwitchUser={(id) => { console.log(id); }}
-        onLogout={handleSignOut}
-        onLogin={() => setShowAuthModal(true)}
-        notifications={notifications}
-        onMarkNotificationsRead={handleMarkNotificationsRead}
-      />
+      {currentView !== 'admin' && (
+          <Navbar 
+            currentView={currentView}
+            onNavigate={handleNavigate}
+            user={currentUser}
+            allUsers={Object.values(users)} 
+            onSwitchUser={(id) => { console.log(id); }}
+            onLogout={handleSignOut}
+            onLogin={() => setShowAuthModal(true)}
+            notifications={notifications}
+            onMarkNotificationsRead={handleMarkNotificationsRead}
+          />
+      )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
+      <div className={currentView === 'admin' ? '' : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24"}>
         {currentView === 'feed' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Hero />
@@ -516,6 +554,7 @@ const App: React.FC = () => {
                       onRequireAuth={() => setShowAuthModal(true)}
                       onOpenDetails={handleOpenDetails}
                       onDelete={handleDeleteRequest}
+                      showDelete={false} // Hide explicit delete on main feed
                     />
                   ))}
                   {sortedRequests.length === 0 && !loading && (
@@ -554,7 +593,21 @@ const App: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).length > 0 ? (
                             requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).map(req => (
-                                <RequestCard key={req.id} request={req} requester={users[req.requesterId]} onFulfill={handleOpenFulfillment} onViewProfile={handleViewProfile} onMarkReceived={handleMarkReceived} onAddComment={handleAddComment} currentUser={currentUser} onRequireAuth={() => setShowAuthModal(true)} onOpenDetails={handleOpenDetails} onDelete={handleDeleteRequest} />
+                                <RequestCard 
+                                    key={req.id} 
+                                    request={req} 
+                                    requester={users[req.requesterId]} 
+                                    onFulfill={handleOpenFulfillment} 
+                                    onViewProfile={handleViewProfile} 
+                                    onMarkReceived={handleMarkReceived} 
+                                    onAddComment={handleAddComment} 
+                                    currentUser={currentUser} 
+                                    onRequireAuth={() => setShowAuthModal(true)} 
+                                    onOpenDetails={handleOpenDetails} 
+                                    onDelete={handleDeleteRequest} 
+                                    showDelete={viewingProfileId === currentUser?.id && profileTab === 'requests'}
+                                    onReactivate={handleReactivateRequest}
+                                />
                             ))
                         ) : (
                             <div className="col-span-full py-12 text-center text-slate-400 italic">No items to display.</div>
@@ -567,6 +620,21 @@ const App: React.FC = () => {
         
         {currentView === 'leaderboard' && <Leaderboard users={Object.values(users)} requests={requests} />}
         {currentView === 'forum' && <Forum currentUser={currentUser} users={users} threads={forumThreads} onAddThread={handleAddForumThread} onAddReply={handleAddForumReply} onRequireAuth={() => setShowAuthModal(true)} />}
+        
+        {/* Admin Route */}
+        {currentView === 'admin' && currentUser?.isAdmin && (
+             <div className="animate-in fade-in">
+                 <button onClick={() => setCurrentView('feed')} className="fixed top-6 right-6 z-50 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 border border-slate-600">
+                    Exit Admin
+                 </button>
+                 <AdminPanel 
+                    users={Object.values(users)} 
+                    requests={requests} 
+                    onDeleteRequest={handleDeleteRequest}
+                    onUpdateUser={handleUpdateUser}
+                 />
+             </div>
+        )}
       </div>
 
       {activeRequest && currentUser && <FulfillmentModal isOpen={isFulfillmentModalOpen} onClose={() => { setIsFulfillmentModalOpen(false); setActiveRequest(null); }} request={activeRequest} currentUser={currentUser} onCommit={handleCommit} onConfirmPurchase={handleConfirmPurchase} onUpdateTracking={handleUpdateTracking} />}

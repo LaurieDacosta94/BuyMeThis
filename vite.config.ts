@@ -13,7 +13,10 @@ export default defineConfig(({ mode }) => {
       
       // Database Configuration
       'process.env.DATABASE_URL': JSON.stringify(env.DATABASE_URL || ''),
-      'process.env.VITE_DATABASE_URL': JSON.stringify(env.VITE_DATABASE_URL || '')
+      'process.env.VITE_DATABASE_URL': JSON.stringify(env.VITE_DATABASE_URL || ''),
+      
+      // Admin Credentials
+      'process.env.ADMIN_PASSWORD': JSON.stringify(env.ADMIN_PASSWORD || 'secret123')
     }
   };
 });

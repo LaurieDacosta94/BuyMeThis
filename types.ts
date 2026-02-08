@@ -60,6 +60,7 @@ export interface User {
   coordinates?: Coordinates;
   trustScore: number;
   badges: Badge[];
+  isAdmin?: boolean; // Admin flag
 }
 
 export interface ProductDetails {

@@ -336,7 +336,7 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                          {request.status === RequestStatus.RECEIVED ? 'Item Received' : 'Item Purchased'}
                      </div>
                  ) : isMyRequest ? (
-                    <Button onClick={handleDelete} size="lg" variant="danger" className="w-full font-bold shadow-xl shadow-red-600/20 py-4 text-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">
+                    <Button onClick={handleDelete} size="lg" className="w-full font-bold shadow-xl shadow-red-600/20 py-4 text-lg bg-red-600 text-white border border-red-700 hover:bg-red-700">
                         <Trash2 className="h-5 w-5 mr-2" /> Delete Request
                     </Button>
                  ) : (
