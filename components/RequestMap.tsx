@@ -9,6 +9,7 @@ interface RequestMapProps {
   onSelectRequest: (request: RequestItem) => void;
   categoryFilter?: Category | 'All';
   searchTerm?: string;
+  onEnableLocation?: () => void;
 }
 
 export const RequestMap: React.FC<RequestMapProps> = ({ 
@@ -16,7 +17,8 @@ export const RequestMap: React.FC<RequestMapProps> = ({
   requests, 
   onSelectRequest,
   categoryFilter = 'All',
-  searchTerm = ''
+  searchTerm = '',
+  onEnableLocation
 }) => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
@@ -65,7 +67,15 @@ export const RequestMap: React.FC<RequestMapProps> = ({
       <div className="w-full h-96 bg-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 p-8 text-center">
         <MapPin className="h-12 w-12 mb-4 opacity-50" />
         <h3 className="text-lg font-semibold text-slate-600">Location Required</h3>
-        <p className="max-w-md mt-2">To view the Request Radar, please add your GPS coordinates in your profile settings so we can show you what's nearby.</p>
+        <p className="max-w-md mt-2 mb-4">To view the Request Radar, please add your GPS coordinates in your profile settings so we can show you what's nearby.</p>
+        {onEnableLocation && (
+            <button 
+                onClick={onEnableLocation}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors"
+            >
+                Enable Location
+            </button>
+        )}
       </div>
     );
   }

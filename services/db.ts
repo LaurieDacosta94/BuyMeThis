@@ -61,7 +61,7 @@ export const db = {
               badges: u.badges || [],
               projects: u.projects || [],
               hobbies: u.hobbies || [],
-              coordinates: undefined // Simplified
+              coordinates: u.coordinates_lat ? { lat: u.coordinates_lat, lng: u.coordinates_lng } : undefined
           };
           this.setSession(user.id);
           return user;
@@ -173,7 +173,7 @@ export const db = {
             receiptVerificationStatus: r.receipt_verification_status,
             enrichedData: r.enriched_data,
             comments: r.comments || [],
-            productUrl: ''
+            productUrl: r.enriched_data?.productUrl || r.productUrl || '' // Ensure productUrl is fetched if stored
         }));
       } catch (e) {
         console.error("DB Error", e);
@@ -186,7 +186,7 @@ export const db = {
       // Note: we assume 'candidates' column exists now.
       await sql`
           INSERT INTO requests (id, requester_id, title, reason, category, delivery_preference, status, location, created_at, coordinates_lat, coordinates_lng, shipping_address, enriched_data, candidates)
-          VALUES (${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.deliveryPreference}, ${req.status}, ${req.location}, ${req.createdAt}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}, ${req.shippingAddress}, ${JSON.stringify(req.enrichedData)}, ${req.candidates})
+          VALUES (${req.id}, ${req.requesterId}, ${req.title}, ${req.reason}, ${req.category}, ${req.deliveryPreference}, ${req.status}, ${req.location}, ${req.createdAt}, ${req.coordinates?.lat || null}, ${req.coordinates?.lng || null}, ${req.shippingAddress}, ${JSON.stringify({...req.enrichedData, productUrl: req.productUrl})}, ${req.candidates})
       `;
   },
 
@@ -202,6 +202,11 @@ export const db = {
       if (updates.thankYouMessage) await sql`UPDATE requests SET thank_you_message = ${updates.thankYouMessage} WHERE id = ${reqId}`;
       if (updates.giftMessage) await sql`UPDATE requests SET gift_message = ${updates.giftMessage} WHERE id = ${reqId}`;
       if (updates.receiptVerificationStatus) await sql`UPDATE requests SET receipt_verification_status = ${updates.receiptVerificationStatus} WHERE id = ${reqId}`;
+  },
+
+  async deleteRequest(reqId: string) {
+      if (!sql) throw new Error("Database not configured");
+      await sql`DELETE FROM requests WHERE id = ${reqId}`;
   },
 
   // --- FORUM ---

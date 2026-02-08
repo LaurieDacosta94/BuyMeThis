@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar } from './components/Navbar';
 import { RequestCard } from './components/RequestCard';
 import { UserProfile } from './components/UserProfile';
@@ -18,6 +18,7 @@ import { RequestItem, RequestStatus, User, Notification, Category, ForumThread, 
 import { Search, Package, ArrowLeft, Map, List, Loader2, Database, AlertCircle } from 'lucide-react';
 import { db } from './services/db';
 import confetti from 'canvas-confetti';
+import { calculateDistance } from './utils/geo';
 
 const App: React.FC = () => {
   // Auth State
@@ -187,6 +188,22 @@ const App: React.FC = () => {
     } catch (err) { showToast('Failed to save request', 'error'); } finally { setLoading(false); }
   };
 
+  const handleDeleteRequest = async (request: RequestItem) => {
+      if (!requireAuth()) return;
+      if (request.requesterId !== currentUser?.id) {
+          showToast("You can only delete your own requests", 'error');
+          return;
+      }
+      try {
+          await db.deleteRequest(request.id);
+          setRequests(prev => prev.filter(r => r.id !== request.id));
+          if (detailsRequest?.id === request.id) setDetailsRequest(null);
+          showToast("Request deleted successfully");
+      } catch (e) {
+          showToast("Failed to delete request", 'error');
+      }
+  };
+
   const handleCommit = async (requestId: string) => {
     if (!requireAuth()) return;
     if (!currentUser) return;
@@ -326,6 +343,31 @@ const App: React.FC = () => {
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
+  const handleRequestLocation = () => {
+      if (!navigator.geolocation) {
+          showToast("Geolocation is not supported by your browser", 'error');
+          return;
+      }
+      navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+              if (currentUser) {
+                  const updatedUser = {
+                      ...currentUser,
+                      coordinates: {
+                          lat: pos.coords.latitude,
+                          lng: pos.coords.longitude
+                      }
+                  };
+                  await handleUpdateUser(updatedUser);
+                  showToast("Location updated successfully!");
+              } else {
+                  showToast("Please log in to save your location", 'error');
+              }
+          },
+          () => showToast("Unable to retrieve location", 'error')
+      );
+  };
+
   // --- RENDERING ---
 
   const handleOpenFulfillment = (request: RequestItem) => {
@@ -356,6 +398,32 @@ const App: React.FC = () => {
     setCurrentView('profile');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const sortedRequests = useMemo(() => {
+      let filtered = requests.filter(r => {
+          const matchesSearch = r.title.toLowerCase().includes(searchTerm.toLowerCase()) || r.reason.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchesCategory = categoryFilter === 'All' || r.category === categoryFilter;
+          return matchesSearch && matchesCategory;
+      });
+
+      // Sort by proximity if available
+      if (currentUser?.coordinates) {
+          filtered.sort((a, b) => {
+              // Prioritize those with coordinates
+              if (a.coordinates && !b.coordinates) return -1;
+              if (!a.coordinates && b.coordinates) return 1;
+              if (!a.coordinates && !b.coordinates) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+
+              const distA = calculateDistance(currentUser.coordinates!.lat, currentUser.coordinates!.lng, a.coordinates!.lat, a.coordinates!.lng);
+              const distB = calculateDistance(currentUser.coordinates!.lat, currentUser.coordinates!.lng, b.coordinates!.lat, b.coordinates!.lng);
+              return distA - distB;
+          });
+      } else {
+          // Default sort: Newest first
+          filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+      return filtered;
+  }, [requests, currentUser?.coordinates, searchTerm, categoryFilter]);
 
   if (authLoading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="h-12 w-12 text-indigo-600 animate-spin" /></div>;
 
@@ -423,16 +491,19 @@ const App: React.FC = () => {
             {currentUser && <RecommendedRequests currentUser={currentUser} requests={requests} onSelectRequest={handleOpenDetails} />}
 
             {feedMode === 'map' ? (
-              <div className="mb-12"><RequestMap currentUser={currentUser} requests={requests} onSelectRequest={handleOpenDetails} categoryFilter={categoryFilter} searchTerm={searchTerm} /></div>
+              <div className="mb-12">
+                  <RequestMap 
+                    currentUser={currentUser} 
+                    requests={requests} 
+                    onSelectRequest={handleOpenDetails} 
+                    categoryFilter={categoryFilter} 
+                    searchTerm={searchTerm} 
+                    onEnableLocation={handleRequestLocation} 
+                  />
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {requests
-                  .filter(r => {
-                    const matchesSearch = r.title.toLowerCase().includes(searchTerm.toLowerCase()) || r.reason.toLowerCase().includes(searchTerm.toLowerCase());
-                    const matchesCategory = categoryFilter === 'All' || r.category === categoryFilter;
-                    return matchesSearch && matchesCategory;
-                  })
-                  .map(req => (
+                {sortedRequests.map(req => (
                     <RequestCard 
                       key={req.id} 
                       request={req} 
@@ -444,9 +515,10 @@ const App: React.FC = () => {
                       currentUser={currentUser}
                       onRequireAuth={() => setShowAuthModal(true)}
                       onOpenDetails={handleOpenDetails}
+                      onDelete={handleDeleteRequest}
                     />
                   ))}
-                  {requests.length === 0 && !loading && (
+                  {sortedRequests.length === 0 && !loading && (
                       <div className="col-span-full py-24 text-center">
                           <div className="bg-slate-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
                             <Package className="h-10 w-10 text-slate-300" />
@@ -482,7 +554,7 @@ const App: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).length > 0 ? (
                             requests.filter(r => profileTab === 'requests' ? r.requesterId === viewingProfileId : r.fulfillerId === viewingProfileId).map(req => (
-                                <RequestCard key={req.id} request={req} requester={users[req.requesterId]} onFulfill={handleOpenFulfillment} onViewProfile={handleViewProfile} onMarkReceived={handleMarkReceived} onAddComment={handleAddComment} currentUser={currentUser} onRequireAuth={() => setShowAuthModal(true)} onOpenDetails={handleOpenDetails} />
+                                <RequestCard key={req.id} request={req} requester={users[req.requesterId]} onFulfill={handleOpenFulfillment} onViewProfile={handleViewProfile} onMarkReceived={handleMarkReceived} onAddComment={handleAddComment} currentUser={currentUser} onRequireAuth={() => setShowAuthModal(true)} onOpenDetails={handleOpenDetails} onDelete={handleDeleteRequest} />
                             ))
                         ) : (
                             <div className="col-span-full py-12 text-center text-slate-400 italic">No items to display.</div>
@@ -498,7 +570,7 @@ const App: React.FC = () => {
       </div>
 
       {activeRequest && currentUser && <FulfillmentModal isOpen={isFulfillmentModalOpen} onClose={() => { setIsFulfillmentModalOpen(false); setActiveRequest(null); }} request={activeRequest} currentUser={currentUser} onCommit={handleCommit} onConfirmPurchase={handleConfirmPurchase} onUpdateTracking={handleUpdateTracking} />}
-      {detailsRequest && <RequestDetailsModal isOpen={!!detailsRequest} onClose={() => setDetailsRequest(null)} request={detailsRequest} requester={users[detailsRequest.requesterId]} onFulfill={() => handleOpenFulfillment(detailsRequest)} currentUser={currentUser} candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} />}
+      {detailsRequest && <RequestDetailsModal isOpen={!!detailsRequest} onClose={() => setDetailsRequest(null)} request={detailsRequest} requester={users[detailsRequest.requesterId]} onFulfill={() => handleOpenFulfillment(detailsRequest)} currentUser={currentUser} candidates={detailsRequest.candidates ? detailsRequest.candidates.map(id => users[id]).filter(Boolean) : []} onDelete={handleDeleteRequest} />}
       {thankYouModalRequest && <ThankYouModal isOpen={!!thankYouModalRequest} onClose={() => setThankYouModalRequest(null)} itemTitle={thankYouModalRequest.title} originalReason={thankYouModalRequest.reason} donorName={users[thankYouModalRequest.fulfillerId || '']?.displayName} onSubmit={submitThankYou} />}
       {currentUser && <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} user={currentUser} onSave={handleUpdateUser} />}
       

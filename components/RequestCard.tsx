@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User } from '../types';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
-import { MapPin, Clock, ArrowRight, PackageCheck, Truck, Quote, FileCheck, Navigation, MessageCircle, Send, AlertTriangle, Heart, Volume2, Loader2, StopCircle, Mic, ShieldCheck, Users } from 'lucide-react';
+import { MapPin, Clock, ArrowRight, PackageCheck, Truck, Quote, FileCheck, Navigation, MessageCircle, Send, AlertTriangle, Heart, Volume2, Loader2, StopCircle, Mic, ShieldCheck, Users, Trash2 } from 'lucide-react';
 import { Button } from './Button';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { playPcmAudio } from '../utils/audio';
+import { LinkPreview } from './LinkPreview';
 
 interface RequestCardProps {
   request: RequestItem;
@@ -16,10 +17,11 @@ interface RequestCardProps {
   currentUser: User | null;
   onRequireAuth: () => void;
   onOpenDetails?: (request: RequestItem) => void;
+  onDelete?: (request: RequestItem) => void;
 }
 
 export const RequestCard: React.FC<RequestCardProps> = ({ 
-  request, requester, onFulfill, onMarkReceived, onViewProfile, onAddComment, currentUser, onRequireAuth, onOpenDetails
+  request, requester, onFulfill, onMarkReceived, onViewProfile, onAddComment, currentUser, onRequireAuth, onOpenDetails, onDelete
 }) => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -43,7 +45,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   
   const isReceived = request.status === RequestStatus.RECEIVED;
   const isFulfilled = request.status === RequestStatus.FULFILLED;
-  const isPending = request.status === RequestStatus.PENDING;
   
   const isVerifiedPurchase = request.receiptVerificationStatus === 'verified';
 
@@ -191,17 +192,35 @@ export const RequestCard: React.FC<RequestCardProps> = ({
 
   const handleCardClick = (e: React.MouseEvent) => {
       // Don't open if clicking on buttons or inputs
-      if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input') || (e.target as HTMLElement).closest('textarea')) {
+      if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input') || (e.target as HTMLElement).closest('textarea') || (e.target as HTMLElement).closest('a')) {
           return;
       }
       if (onOpenDetails) onOpenDetails(request);
   };
 
+  const handleDelete = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (confirm("Are you sure you want to delete this request?") && onDelete) {
+          onDelete(request);
+      }
+  };
+
   return (
     <div 
         onClick={handleCardClick}
-        className={`group bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col hover:-translate-y-1 h-full cursor-pointer`}
+        className={`group bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col hover:-translate-y-1 h-full cursor-pointer relative`}
     >
+      {/* Delete Button for Owner */}
+      {isMyRequest && !isFulfilled && !isReceived && (
+          <button 
+            onClick={handleDelete}
+            className="absolute top-4 right-4 z-20 p-2 bg-white/90 rounded-full shadow-sm text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Delete Request"
+          >
+              <Trash2 className="h-4 w-4" />
+          </button>
+      )}
+
       <div className="relative h-56 overflow-hidden bg-slate-100">
         <img 
           src={request.enrichedData?.imageUrl || `https://picsum.photos/seed/${request.id}/400/200`} 
@@ -216,7 +235,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
              {request.location}
            </div>
            
-           <span className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-indigo-600 shadow-sm">
+           <span className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-indigo-600 shadow-sm mr-8">
              {request.category}
            </span>
         </div>
@@ -265,9 +284,15 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         </div>
 
         <h3 className="text-xl font-bold text-slate-900 mb-2 leading-tight">{request.title}</h3>
-        <p className="text-slate-600 text-sm leading-relaxed mb-6 flex-1 line-clamp-3">
+        <p className="text-slate-600 text-sm leading-relaxed mb-4 flex-1 line-clamp-3">
           {request.reason}
         </p>
+
+        {request.productUrl && (
+            <div className="mb-6" onClick={(e) => e.stopPropagation()}>
+                <LinkPreview url={request.productUrl} />
+            </div>
+        )}
 
         {/* Candidate Count */}
         {request.candidates && request.candidates.length > 0 && !isFulfilled && !isReceived && (
@@ -437,8 +462,13 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                     <PackageCheck className="h-4 w-4 mr-2" /> Item Received
                   </div>
                ) : (
-                  <div className="w-full bg-slate-100 text-slate-500 font-medium py-2.5 rounded-xl text-center text-sm border border-slate-200">
-                    Request Open
+                  <div className="w-full flex items-center justify-between gap-2">
+                      <div className="flex-1 bg-slate-100 text-slate-500 font-medium py-2.5 rounded-xl text-center text-sm border border-slate-200">
+                        Request Open
+                      </div>
+                      <Button onClick={handleDelete} variant="danger" size="sm" className="rounded-xl px-4 py-2.5 bg-red-100 text-red-600 border border-red-200 hover:bg-red-200 shadow-none">
+                          Delete
+                      </Button>
                   </div>
                )
              ) : isMyCommitment ? (

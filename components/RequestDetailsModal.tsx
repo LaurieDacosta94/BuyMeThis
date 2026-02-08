@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User, DeliveryPreference } from '../types';
 import { Button } from './Button';
-import { X, MapPin, Clock, MessageCircle, Send, Heart, Users, CheckCircle, Navigation, ShieldCheck, Truck, Handshake, Globe, AlertTriangle, Loader2, StopCircle, Mic, Volume2 } from 'lucide-react';
+import { X, MapPin, Clock, MessageCircle, Send, Heart, Users, CheckCircle, Navigation, ShieldCheck, Truck, Handshake, Globe, AlertTriangle, Loader2, StopCircle, Mic, Volume2, Trash2 } from 'lucide-react';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
 import { playPcmAudio } from '../utils/audio';
+import { LinkPreview } from './LinkPreview';
 
 interface RequestDetailsModalProps {
   request: RequestItem;
@@ -15,10 +16,11 @@ interface RequestDetailsModalProps {
   currentUser: User | null;
   candidates: User[]; // Array of full user objects
   onAddComment?: (requestId: string, text: string) => void;
+  onDelete?: (request: RequestItem) => void;
 }
 
 export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({ 
-  request, requester, isOpen, onClose, onFulfill, currentUser, candidates, onAddComment
+  request, requester, isOpen, onClose, onFulfill, currentUser, candidates, onAddComment, onDelete
 }) => {
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
@@ -33,6 +35,8 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
   const [isRecordingComment, setIsRecordingComment] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  const isMyRequest = currentUser && request.requesterId === currentUser.id;
 
   if (!isOpen) return null;
 
@@ -160,6 +164,13 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
       }
   };
 
+  const handleDelete = () => {
+      if (confirm("Are you sure you want to delete this request?") && onDelete) {
+          onDelete(request);
+          onClose();
+      }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
@@ -212,6 +223,12 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                  <h3 className="text-lg font-bold text-slate-900 mb-2">Why this is needed</h3>
                  <p className="text-slate-600 leading-relaxed text-lg">{request.reason}</p>
              </div>
+
+             {request.productUrl && (
+                <div className="mb-8">
+                    <LinkPreview url={request.productUrl} />
+                </div>
+             )}
 
              {/* Audio Player */}
              <div className="mb-8">
@@ -318,6 +335,10 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                          <CheckCircle className="h-6 w-6" /> 
                          {request.status === RequestStatus.RECEIVED ? 'Item Received' : 'Item Purchased'}
                      </div>
+                 ) : isMyRequest ? (
+                    <Button onClick={handleDelete} size="lg" variant="danger" className="w-full font-bold shadow-xl shadow-red-600/20 py-4 text-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">
+                        <Trash2 className="h-5 w-5 mr-2" /> Delete Request
+                    </Button>
                  ) : (
                     <Button onClick={onFulfill} size="lg" className="w-full font-bold shadow-xl shadow-indigo-600/20 py-4 text-lg">
                         {isCandidate ? 'Complete Fulfillment' : 'I Can Help with This'}
