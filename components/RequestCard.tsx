@@ -49,16 +49,14 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   const isFulfilled = request.status === RequestStatus.FULFILLED;
   
   const isVerifiedPurchase = request.receiptVerificationStatus === 'verified';
-
-  // Inactive logic: 30 days
   const isInactive = request.status === RequestStatus.OPEN && (Date.now() - new Date(request.createdAt).getTime() > 30 * 24 * 60 * 60 * 1000);
 
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours < 1) return 'Just now';
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
+    if (hours < 1) return 'NOW';
+    if (hours < 24) return `${hours}H AGO`;
+    return `${Math.floor(hours / 24)}D AGO`;
   };
 
   const distanceInfo = React.useMemo(() => {
@@ -88,7 +86,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       try {
         const safety = await validateContent(newComment);
         if (!safety.safe) {
-            setCommentError(safety.reason || "This comment was flagged as inappropriate.");
+            setCommentError(safety.reason || "Flagged inappropriate.");
             setIsPostingComment(false);
             return;
         }
@@ -96,7 +94,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         onAddComment(request.id, newComment);
         setNewComment('');
       } catch (err) {
-          setCommentError("Failed to post comment.");
+          setCommentError("Failed to post.");
       } finally {
         setIsPostingComment(false);
       }
@@ -120,17 +118,12 @@ export const RequestCard: React.FC<RequestCardProps> = ({
               const source = await playPcmAudio(audioBase64);
               setAudioSource(source);
               setIsPlayingAudio(true);
-              
               source.onended = () => {
                   setIsPlayingAudio(false);
                   setAudioSource(null);
               };
           }
-      } catch (err) {
-          console.error(err);
-      } finally {
-          setIsLoadingAudio(false);
-      }
+      } catch (err) { console.error(err); } finally { setIsLoadingAudio(false); }
   };
 
   const startRecording = async () => {
@@ -145,9 +138,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         audioChunksRef.current = [];
 
         mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                audioChunksRef.current.push(event.data);
-            }
+            if (event.data.size > 0) audioChunksRef.current.push(event.data);
         };
 
         mediaRecorder.onstop = async () => {
@@ -161,13 +152,11 @@ export const RequestCard: React.FC<RequestCardProps> = ({
                  reader.onloadend = async () => {
                      const base64Audio = reader.result as string;
                      const text = await transcribeAudio(base64Audio);
-                     if (text) {
-                        setNewComment(prev => prev + (prev ? ' ' : '') + text);
-                     }
+                     if (text) setNewComment(prev => prev + (prev ? ' ' : '') + text);
                      setIsPostingComment(false);
                  };
             } catch (err) {
-                setCommentError("Failed to transcribe audio.");
+                setCommentError("Audio failed.");
                 setIsPostingComment(false);
             }
         };
@@ -175,7 +164,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         mediaRecorder.start();
         setIsRecordingComment(true);
     } catch (err) {
-        setCommentError("Could not access microphone.");
+        setCommentError("No mic access.");
     }
   };
 
@@ -188,15 +177,11 @@ export const RequestCard: React.FC<RequestCardProps> = ({
 
   const handleActionClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (!currentUser) {
-          onRequireAuth();
-          return;
-      }
+      if (!currentUser) { onRequireAuth(); return; }
       onFulfill(request);
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-      // Don't open if clicking on buttons or inputs
       if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input') || (e.target as HTMLElement).closest('textarea') || (e.target as HTMLElement).closest('a')) {
           return;
       }
@@ -205,83 +190,60 @@ export const RequestCard: React.FC<RequestCardProps> = ({
 
   const handleDelete = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (confirm("Are you sure you want to delete this request?") && onDelete) {
-          onDelete(request);
-      }
-  };
-
-  const handleReactivate = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (onReactivate) onReactivate(request);
+      if (confirm("Delete this request?") && onDelete) onDelete(request);
   };
 
   return (
     <div 
         onClick={handleCardClick}
-        className={`group bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col hover:-translate-y-1 h-full cursor-pointer relative ${isInactive ? 'opacity-80' : ''}`}
+        className={`group bg-white border border-slate-200 hover:border-blue-500 transition-colors duration-200 cursor-pointer flex flex-col h-full relative ${isInactive ? 'opacity-75 grayscale' : ''}`}
     >
-      <div className="relative h-56 overflow-hidden bg-slate-100">
+      <div className="relative h-48 overflow-hidden bg-slate-100 border-b border-slate-200">
         <img 
           src={request.enrichedData?.imageUrl || `https://picsum.photos/seed/${request.id}/400/200`} 
           alt={request.title} 
-          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${isInactive ? 'grayscale' : ''}`}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60"></div>
         
-        <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
-           <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-slate-700 flex items-center gap-1.5 shadow-sm">
-             <MapPin className="h-3 w-3 text-indigo-500" />
+        <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start pointer-events-none">
+           <div className="bg-slate-900/90 text-white px-2 py-1 text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
+             <MapPin className="h-3 w-3" />
              {request.location}
            </div>
            
-           <div className="flex items-center gap-2">
-                <span className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-indigo-600 shadow-sm">
-                    {request.category}
-                </span>
-                
-                {/* Small Delete Button (Only on profile) */}
-                {showDelete && !isFulfilled && !isReceived && (
-                    <button 
-                        onClick={handleDelete}
-                        className="p-2 bg-white/90 rounded-full shadow-sm text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Delete Request"
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </button>
+           <div className="flex gap-2">
+               {distanceInfo && (
+                <div className="bg-blue-600/90 text-white px-2 py-1 text-[10px] uppercase font-bold tracking-wider">
+                   {distanceInfo}
+                 </div>
                 )}
+                <div className="bg-white/90 text-slate-900 px-2 py-1 text-[10px] uppercase font-bold tracking-wider border border-slate-900">
+                    {request.category}
+                </div>
            </div>
         </div>
 
-        {distanceInfo && (
-            <div className="absolute bottom-4 left-4 bg-indigo-600/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white flex items-center gap-1.5 shadow-sm">
-               <Navigation className="h-3 w-3" />
-               {distanceInfo}
-             </div>
-        )}
-
-        {/* Status Badges */}
+        {/* Status Overlays */}
         {isReceived ? (
-          <div className="absolute inset-0 bg-green-900/60 flex items-center justify-center backdrop-blur-[2px]">
-            <span className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-bold shadow-lg transform -rotate-6 border-2 border-green-200 flex items-center gap-2">
-              <PackageCheck className="h-5 w-5" /> RECEIVED
+          <div className="absolute inset-0 bg-green-900/70 flex items-center justify-center">
+            <span className="border-2 border-white text-white px-4 py-2 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <PackageCheck className="h-5 w-5" /> Received
             </span>
           </div>
         ) : isFulfilled ? (
-          <div className="absolute inset-0 bg-teal-900/40 flex items-center justify-center backdrop-blur-[2px]">
-            <span className="bg-teal-100 text-teal-800 px-4 py-2 rounded-full text-sm font-bold shadow-lg transform -rotate-6 border-2 border-teal-200 flex items-center gap-2">
-               {isVerifiedPurchase ? <ShieldCheck className="h-5 w-5 text-teal-600" /> : null} 
-               {isVerifiedPurchase ? 'VERIFIED PURCHASE' : 'PURCHASED'}
+          <div className="absolute inset-0 bg-blue-900/70 flex items-center justify-center">
+            <span className="border-2 border-white text-white px-4 py-2 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+               {isVerifiedPurchase ? <ShieldCheck className="h-5 w-5" /> : null} 
+               {isVerifiedPurchase ? 'Verified' : 'Fulfilled'}
             </span>
           </div>
         ) : isInactive ? (
-            <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center backdrop-blur-[2px]">
-                <div className="text-center">
-                    <span className="bg-slate-200 text-slate-600 px-4 py-2 rounded-full text-sm font-bold shadow-lg flex items-center gap-2 mb-2 justify-center">
-                        <AlertOctagon className="h-5 w-5" /> INACTIVE
-                    </span>
+            <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
+                <div className="text-center pointer-events-auto">
+                    <span className="text-white text-sm font-mono uppercase tracking-widest mb-2 block">Inactive</span>
                     {isMyRequest && (
-                         <button onClick={handleReactivate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-2">
-                             <RefreshCw className="h-3 w-3" /> Reactivate Post
+                         <button onClick={(e) => {e.stopPropagation(); onReactivate && onReactivate(request)}} className="bg-blue-600 text-white px-3 py-1 text-xs uppercase font-bold hover:bg-blue-500">
+                             Reactivate
                          </button>
                     )}
                 </div>
@@ -289,281 +251,149 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         ) : null}
       </div>
 
-      <div className="p-6 flex-1 flex flex-col">
-        <div className="flex items-start justify-between mb-4">
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="flex items-start justify-between mb-3">
           <div 
             className="flex items-center gap-3 group/user cursor-pointer"
             onClick={(e) => { e.stopPropagation(); onViewProfile && onViewProfile(requester.id); }}
-            title="View Profile"
           >
-            <img src={requester.avatarUrl} alt={requester.displayName} className="h-10 w-10 rounded-full bg-slate-200 object-cover ring-2 ring-transparent group-hover/user:ring-indigo-100 transition-all" />
+            <img src={requester.avatarUrl} alt={requester.displayName} className="h-8 w-8 bg-slate-200 object-cover rounded-none" />
             <div>
-              <p className="text-sm font-bold text-slate-900 leading-tight group-hover/user:text-indigo-600 transition-colors">{requester.displayName}</p>
-              <p className="text-xs text-slate-500 font-medium">@{requester.handle}</p>
+              <p className="text-xs font-bold text-slate-900 uppercase tracking-wide group-hover/user:text-blue-600">{requester.displayName}</p>
+              <p className="text-[10px] text-slate-500 font-mono">@{requester.handle}</p>
             </div>
           </div>
-          <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-full">
-            <Clock className="h-3 w-3" />
+          <span className="text-[10px] font-mono text-slate-400">
             {timeAgo(request.createdAt)}
           </span>
         </div>
 
-        <h3 className="text-xl font-bold text-slate-900 mb-2 leading-tight">{request.title}</h3>
-        <p className="text-slate-600 text-sm leading-relaxed mb-4 flex-1 line-clamp-3">
+        <h3 className="text-base font-bold text-slate-900 mb-2 leading-snug">{request.title}</h3>
+        <p className="text-slate-600 text-xs leading-relaxed mb-4 flex-1 line-clamp-3 font-medium">
           {request.reason}
         </p>
 
         {request.productUrl && (
-            <div className="mb-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4" onClick={(e) => e.stopPropagation()}>
                 <LinkPreview url={request.productUrl} />
             </div>
         )}
 
-        {/* Candidate Count */}
         {request.candidates && request.candidates.length > 0 && !isFulfilled && !isReceived && (
-            <div className="mb-4 flex items-center gap-2 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100">
-                <Users className="h-4 w-4 text-indigo-500" />
-                <span className="text-xs font-bold text-indigo-700">
-                    {request.candidates.length} {request.candidates.length === 1 ? 'person' : 'people'} offered to help
-                </span>
+            <div className="mb-3 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 p-2 border border-blue-100">
+                <Users className="h-3 w-3" />
+                <span className="font-bold">{request.candidates.length}</span> offers pending
             </div>
         )}
         
-        {/* Listen Button */}
-        <div className="mb-6">
-            <button 
+        <div className="flex justify-between items-center mb-4">
+             <button 
                 onClick={handlePlayAudio}
-                className={`text-xs font-bold flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${isPlayingAudio ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                className="text-xs font-bold flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors uppercase"
                 disabled={isLoadingAudio}
             >
-                {isLoadingAudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isPlayingAudio ? <StopCircle className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                {isLoadingAudio ? 'Loading...' : isPlayingAudio ? 'Stop Listening' : 'Listen to Story'}
+                {isLoadingAudio ? <Loader2 className="h-3 w-3 animate-spin" /> : isPlayingAudio ? <StopCircle className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                {isLoadingAudio ? 'Loading...' : isPlayingAudio ? 'Stop' : 'Listen'}
             </button>
+
+            {showDelete && !isFulfilled && !isReceived && (
+                <button 
+                    onClick={handleDelete}
+                    className="text-slate-400 hover:text-red-600"
+                    title="Delete Request"
+                >
+                    <Trash2 className="h-3 w-3" />
+                </button>
+            )}
         </div>
 
-        {/* Receipt Toggle */}
-        {(isFulfilled || isReceived) && request.proofOfPurchaseImage && isMyRequest && (
-          <div className="mb-4">
-             <button 
-               onClick={(e) => { e.stopPropagation(); setShowReceipt(!showReceipt); }}
-               className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 mb-2 bg-indigo-50 px-3 py-2 rounded-lg"
-             >
-               <FileCheck className="h-3.5 w-3.5" />
-               {showReceipt ? 'Hide Receipt' : 'View Proof of Purchase'}
-             </button>
-             
-             {showReceipt && (
-               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                 <img 
-                   src={request.proofOfPurchaseImage} 
-                   alt="Proof of Purchase" 
-                   className="w-full h-auto rounded-lg shadow-sm border border-slate-100" 
-                 />
-                 {isVerifiedPurchase && (
-                     <div className="mt-2 bg-green-50 border border-green-200 rounded p-2 flex items-center gap-2 text-[10px] text-green-700 font-bold">
-                         <ShieldCheck className="h-3.5 w-3.5" /> AI Verified: Valid Proof
-                     </div>
-                 )}
-               </div>
-             )}
-          </div>
-        )}
-
-        {/* Gift Message Display */}
-        {(isFulfilled || isReceived) && request.giftMessage && (
-           <div className="mt-2 mb-4 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 relative">
-             <Heart className="h-5 w-5 text-indigo-300 absolute top-3 left-3 fill-current" />
-             <p className="text-[10px] text-indigo-400 uppercase font-bold text-center mb-1 tracking-wider">Gift Message</p>
-             <p className="text-sm text-indigo-900 italic text-center px-4 font-serif">"{request.giftMessage}"</p>
-           </div>
-        )}
-
-        {/* Thank You Note Display */}
-        {isReceived && request.thankYouMessage && (
-           <div className="mt-2 mb-4 bg-pink-50/50 p-4 rounded-2xl border border-pink-100/50 relative">
-             <Quote className="h-5 w-5 text-pink-300 absolute top-3 left-3 transform -scale-x-100 fill-current" />
-             <p className="text-[10px] text-pink-400 uppercase font-bold text-center mb-1 tracking-wider">Thank You Note</p>
-             <p className="text-sm text-pink-900 italic text-center px-4 font-serif">"{request.thankYouMessage}"</p>
-           </div>
-        )}
-
         {/* Interaction Bar */}
-        <div className="border-t border-slate-100 pt-4 mt-auto">
+        <div className="border-t border-slate-100 pt-3 mt-auto">
           
-          {/* Comments Section Toggle */}
-          <div className="mb-4">
+          <div className="mb-3">
              <button 
                onClick={(e) => { e.stopPropagation(); setShowComments(!showComments); }}
-               className={`w-full text-xs font-bold flex items-center justify-center gap-2 py-2 rounded-lg transition-colors ${request.comments.length > 0 || showComments ? 'text-slate-700 bg-slate-50 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+               className="w-full text-xs font-bold text-slate-500 hover:text-slate-900 flex items-center justify-center gap-2 py-1 transition-colors uppercase"
              >
-               <MessageCircle className="h-4 w-4" />
-               {request.comments.length > 0 ? `${request.comments.length} Comments` : 'Ask a Question'}
+               <MessageCircle className="h-3 w-3" />
+               {request.comments.length > 0 ? `${request.comments.length} Comments` : 'Discussion'}
              </button>
           </div>
 
           {showComments && (
-            <div className="bg-slate-50/80 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 border border-slate-100" onClick={e => e.stopPropagation()}>
-              {request.comments.length > 0 ? (
-                <div className="space-y-4 mb-4 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                  {request.comments.map(comment => (
-                    <div key={comment.id} className="flex gap-3 items-start">
-                       <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${comment.userId === requester.id ? 'bg-indigo-400' : 'bg-slate-300'}`}></div>
-                       <div>
-                         <div className="flex items-center gap-2 mb-0.5">
-                            <span className={`text-xs font-bold ${comment.userId === requester.id ? 'text-indigo-700' : 'text-slate-700'}`}>
-                              {currentUser && comment.userId === currentUser.id ? 'You' : (comment.userId === requester.id ? 'Requester' : 'User')}
-                            </span>
-                            <span className="text-[10px] text-slate-400">{timeAgo(comment.createdAt)}</span>
-                         </div>
-                         <p className="text-xs text-slate-600 leading-relaxed">{comment.text}</p>
-                       </div>
-                    </div>
+            <div className="bg-slate-50 border-y border-slate-200 -mx-4 px-4 py-3 mb-3 text-xs" onClick={e => e.stopPropagation()}>
+              <div className="space-y-2 mb-3 max-h-32 overflow-y-auto custom-scrollbar">
+                  {request.comments.map(c => (
+                      <div key={c.id} className="flex gap-2">
+                          <span className="font-bold text-slate-900">{c.userId === requester.id ? 'OP' : 'User'}:</span>
+                          <span className="text-slate-600">{c.text}</span>
+                      </div>
                   ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 mb-2">
-                    <MessageCircle className="h-6 w-6 text-slate-200 mx-auto mb-2" />
-                    <p className="text-xs text-slate-400 italic">No questions yet.</p>
-                </div>
-              )}
+                  {request.comments.length === 0 && <span className="text-slate-400 italic">No comments.</span>}
+              </div>
               
-              {/* Comment Input */}
-              <form onSubmit={handleCommentSubmit} className="relative">
+              <form onSubmit={handleCommentSubmit} className="flex gap-2">
                 <input 
                   type="text" 
                   value={newComment}
                   onChange={(e) => { setNewComment(e.target.value); setCommentError(null); }}
-                  placeholder={currentUser ? "Type a question..." : "Log in to comment"}
-                  className={`w-full pl-4 pr-20 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${commentError ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}
+                  placeholder="Type..."
+                  className="flex-1 bg-white border border-slate-300 px-2 py-1 rounded-none outline-none focus:border-blue-500"
                   disabled={isPostingComment || isRecordingComment}
-                  onFocus={() => !currentUser && onRequireAuth()}
                 />
-                <div className="absolute right-1.5 top-1.5 flex gap-1">
-                   {isRecordingComment ? (
-                     <button type="button" onClick={stopRecording} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg animate-pulse">
-                        <StopCircle className="h-4 w-4" />
-                     </button>
+                 {isRecordingComment ? (
+                     <button type="button" onClick={stopRecording} className="text-red-600 animate-pulse"><StopCircle className="h-4 w-4" /></button>
                    ) : (
-                     <button type="button" onClick={startRecording} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Record Voice Note">
-                        <Mic className="h-4 w-4" />
-                     </button>
+                     <button type="button" onClick={startRecording} className="text-slate-400 hover:text-blue-600"><Mic className="h-4 w-4" /></button>
                    )}
-                   <button 
-                    type="submit"
-                    disabled={(!newComment.trim() && !isRecordingComment) || isPostingComment}
-                    className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:bg-slate-300 transition-colors shadow-sm"
-                  >
-                    {isPostingComment ? (
-                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
+                <button type="submit" disabled={!newComment} className="text-blue-600 font-bold disabled:text-slate-300">SEND</button>
               </form>
-              {commentError && (
-                  <div className="text-[10px] text-red-600 mt-2 flex items-center gap-1 font-medium bg-red-50 px-2 py-1 rounded">
-                      <AlertTriangle className="h-3 w-3" /> {commentError}
-                  </div>
-              )}
+              {commentError && <div className="text-red-600 mt-1">{commentError}</div>}
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between min-h-[44px]">
-             {/* Requester View */}
+          {/* Action Area */}
+          <div className="pt-1">
              {isMyRequest ? (
                isFulfilled ? (
-                 <Button 
-                   size="sm" 
-                   variant="primary" 
-                   onClick={(e) => { e.stopPropagation(); onMarkReceived && onMarkReceived(request); }}
-                   className="w-full bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 rounded-xl py-2.5"
-                 >
-                   <PackageCheck className="mr-2 h-4 w-4" /> Mark Received
+                 <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); onMarkReceived && onMarkReceived(request); }} className="w-full bg-green-600 hover:bg-green-700">
+                   Confirm Receipt
                  </Button>
                ) : isReceived ? (
-                  <div className="w-full bg-green-50 text-green-700 font-bold py-2.5 rounded-xl text-center flex items-center justify-center text-sm border border-green-200">
-                    <PackageCheck className="h-4 w-4 mr-2" /> Item Received
+                  <div className="w-full bg-slate-100 text-slate-500 font-bold py-2 text-center text-xs border border-slate-200 uppercase">
+                    Received
                   </div>
-               ) : isInactive ? (
-                   /* Inactive state handled by overlay but we can disable buttons here too */
-                   <div className="w-full text-center text-xs text-slate-400 italic">Inactive Post</div>
                ) : (
-                  <div className="w-full flex items-center justify-between gap-2">
-                      <div className="flex-1 bg-slate-100 text-slate-500 font-medium py-2.5 rounded-xl text-center text-sm border border-slate-200">
-                        Request Open
-                      </div>
-                      {/* Large Delete Button - only if showDelete is true (profile) or explicit delete allowed, 
-                          but typically we only show delete on profile or detail. 
-                          If this is the main feed, maybe hide delete? 
-                          User requirement: "Delete buttons should be only seen from the user profile page."
-                          So we hide this large button unless showDelete is true.
-                      */}
-                      {showDelete && (
-                        <Button onClick={handleDelete} size="sm" className="rounded-xl px-4 py-2.5 bg-red-600 text-white border border-red-700 hover:bg-red-700 shadow-none font-bold">
-                            Delete
-                        </Button>
-                      )}
+                  <div className="w-full bg-slate-50 text-slate-400 font-bold py-2 text-center text-xs border border-slate-200 uppercase tracking-widest">
+                    Your Request
                   </div>
                )
              ) : isMyCommitment ? (
-               /* Fulfiller View */
                isFulfilled ? (
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={handleActionClick}
-                    className="w-full rounded-xl py-2.5"
-                  >
-                    <Truck className="mr-2 h-4 w-4" /> Update Tracking
+                  <Button size="sm" variant="outline" onClick={handleActionClick} className="w-full">
+                    Update Tracking
                   </Button>
-               ) : isReceived ? (
-                  <div className="w-full bg-pink-50 text-pink-600 font-bold py-2.5 rounded-xl text-center flex items-center justify-center gap-2 text-sm border border-pink-200">
-                     Mission Accomplished <span className="text-lg">🎉</span>
-                  </div>
                ) : (
-                  <Button 
-                     size="sm" 
-                     variant="secondary"
-                     onClick={handleActionClick}
-                     className="w-full rounded-xl py-2.5 shadow-lg shadow-teal-600/20"
-                   >
-                     Confirm Purchase <ArrowRight className="ml-2 h-4 w-4" />
+                  <Button size="sm" variant="secondary" onClick={handleActionClick} className="w-full">
+                     Finalize Purchase <ArrowRight className="ml-2 h-3 w-3" />
                    </Button>
                )
              ) : (
-               /* Public / Guest View */
                isReceived || isFulfilled ? (
-                 <div className="w-full bg-slate-50 text-slate-400 font-bold py-2.5 rounded-xl text-center text-sm border border-slate-200">
-                    Already fulfilled
+                 <div className="w-full bg-slate-50 text-slate-300 font-bold py-2 text-center text-xs border border-slate-100 uppercase">
+                    Closed
                  </div>
                ) : amICandidate ? (
-                 <div className="w-full flex gap-2">
-                     <div className="flex-1 bg-indigo-50 text-indigo-700 font-bold py-2.5 rounded-xl text-center text-sm border border-indigo-200 flex items-center justify-center gap-2">
-                         <CheckCircle className="h-4 w-4" /> You Offered Help
-                     </div>
-                     <Button 
-                        size="sm"
-                        variant="secondary"
-                        onClick={handleActionClick}
-                        className="rounded-xl px-4"
-                     >
-                        Confirm
-                     </Button>
-                 </div>
+                 <Button size="sm" variant="secondary" onClick={handleActionClick} className="w-full">
+                    Confirm Help
+                 </Button>
                ) : isInactive ? (
-                 <div className="w-full bg-slate-100 text-slate-400 font-bold py-2.5 rounded-xl text-center text-sm border border-slate-200">
+                 <div className="w-full bg-slate-100 text-slate-400 font-bold py-2 text-center text-xs border border-slate-200 uppercase">
                     Inactive
                  </div>
                ) : (
-                 <Button 
-                   size="sm" 
-                   variant="primary"
-                   onClick={handleActionClick}
-                   className="w-full rounded-xl py-2.5 font-bold shadow-lg shadow-indigo-600/20"
-                 >
-                   I Can Help <ArrowRight className="ml-2 h-4 w-4" />
+                 <Button size="sm" variant="primary" onClick={handleActionClick} className="w-full">
+                   Fulfill Request <ArrowRight className="ml-2 h-3 w-3" />
                  </Button>
                )
              )}
@@ -573,8 +403,3 @@ export const RequestCard: React.FC<RequestCardProps> = ({
     </div>
   );
 };
-
-// Simple internal icon for this file
-function CheckCircle({ className }: { className?: string }) {
-    return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
-}
