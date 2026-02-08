@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { db } from '../services/db';
 import { Button } from './Button';
-import { Gift, Mail, Lock, User, MapPin, AtSign, AlertCircle, ArrowRight, Database, Copy, Check, Shield } from 'lucide-react';
+import { Gift, Mail, Lock, User, MapPin, AtSign, AlertCircle, ArrowRight, Database, Copy, Check, Shield, Wrench } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface AuthProps {
   onLoginSuccess: () => void;
 }
 
-// SQL Script for setting up Neon
+// SQL to fix the specific missing column error without wiping data
+const MIGRATION_SQL = `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin boolean DEFAULT false;`;
+
+// SQL Script for setting up Neon (Full Reset)
 const NEON_SETUP_SQL = `
 -- RESET DATABASE (Drop all existing tables)
 DROP TABLE IF EXISTS notifications CASCADE;
@@ -99,6 +102,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedMigration, setCopiedMigration] = useState(false);
 
   // Form Fields
   const [email, setEmail] = useState(''); // Used as handle/identifier
@@ -108,6 +112,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   const [location, setLocation] = useState('');
 
   const isAdminAttempt = email.toLowerCase() === 'admin';
+  const isSchemaError = error && error.includes('column') && error.includes('does not exist');
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +181,12 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
       navigator.clipboard.writeText(NEON_SETUP_SQL);
       setCopiedSql(true);
       setTimeout(() => setCopiedSql(false), 2000);
+  };
+
+  const copyMigrationToClipboard = () => {
+      navigator.clipboard.writeText(MIGRATION_SQL);
+      setCopiedMigration(true);
+      setTimeout(() => setCopiedMigration(false), 2000);
   };
 
   if (showSetup) {
@@ -314,9 +325,35 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
               </div>
 
               {error && (
-                  <div className="flex items-start gap-2 text-red-600 text-xs bg-red-50 p-2.5 rounded-lg border border-red-100">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                    <span>{error}</span>
+                  <div className="space-y-3">
+                      <div className="flex items-start gap-2 text-red-600 text-xs bg-red-50 p-2.5 rounded-lg border border-red-100">
+                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <span className="break-all">{error}</span>
+                      </div>
+                      
+                      {isSchemaError && (
+                          <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs animate-in fade-in">
+                              <div className="flex items-center gap-2 font-bold text-amber-700 mb-1">
+                                  <Wrench className="h-3 w-3" /> Database Schema Mismatch
+                              </div>
+                              <p className="text-amber-600 mb-2">
+                                  Your database is missing the <code>is_admin</code> column. Run this SQL in your Neon SQL Editor to fix it:
+                              </p>
+                              <div className="flex gap-2">
+                                  <code className="flex-1 bg-white border border-amber-200 p-2 rounded font-mono text-[10px] text-slate-600 overflow-x-auto whitespace-nowrap">
+                                      {MIGRATION_SQL}
+                                  </code>
+                                  <button 
+                                      type="button"
+                                      onClick={copyMigrationToClipboard}
+                                      className="bg-amber-100 hover:bg-amber-200 text-amber-700 p-2 rounded border border-amber-200 transition-colors"
+                                      title="Copy SQL"
+                                  >
+                                      {copiedMigration ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                              </div>
+                          </div>
+                      )}
                   </div>
               )}
 
