@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RequestItem, RequestStatus, User, Fulfillment } from '../types';
 import { Button } from './Button';
-import { Lock, Copy, CheckCircle, ExternalLink, X, Truck, Image as ImageIcon, Search, Sparkles, MapPin, Globe, ShieldAlert, Heart, Smile, Zap, Loader2, HandHelping, UploadCloud, Camera } from 'lucide-react';
+import { Lock, Copy, CheckCircle, ExternalLink, X, Truck, Image as ImageIcon, Search, Sparkles, MapPin, Globe, ShieldAlert, Heart, Smile, Zap, Loader2, HandHelping, UploadCloud, Camera, ShoppingCart } from 'lucide-react';
 import { findBuyingOptions, findLocalStores, BuyingOption, generateGiftMessage, getSafetyTips, verifyReceipt } from '../services/geminiService';
 
 interface FulfillmentModalProps {
@@ -111,10 +111,21 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
            
            <div className="absolute -bottom-6 left-6 right-6 bg-white rounded-2xl p-4 shadow-lg border border-cyan-50 flex gap-4 items-center">
                 <img src={request.enrichedData?.imageUrl || 'https://picsum.photos/200'} alt={request.title} className="w-12 h-12 rounded-xl object-cover border border-slate-100" />
-                <div>
-                   <h3 className="font-bold text-slate-800 text-sm">{request.title}</h3>
+                <div className="flex-1">
+                   <h3 className="font-bold text-slate-800 text-sm line-clamp-1">{request.title}</h3>
                    <div className="text-xs text-slate-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> {request.location}</div>
                 </div>
+                {request.productUrl && (
+                  <a 
+                    href={request.productUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors"
+                    title="View Product Page"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
            </div>
         </div>
 
@@ -138,6 +149,11 @@ export const FulfillmentModal: React.FC<FulfillmentModalProps> = ({
                </div>
                <div>
                    <p className="text-slate-600 font-medium mb-4">By accepting this request, you're promising to help purchase and send this item. Are you ready to be a hero?</p>
+                   {request.productUrl && (
+                      <a href={request.productUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200 transition-colors mb-4">
+                         <ShoppingCart className="w-3 h-3" /> Check Product Price
+                      </a>
+                   )}
                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-500 flex items-center gap-2 text-left mb-6">
                        <Lock className="w-4 h-4 shrink-0" /> Shipping address will be revealed after you accept.
                    </div>

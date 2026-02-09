@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { RequestItem, RequestStatus, User, DeliveryPreference, Fulfillment, Category } from '../types';
 import { Button } from './Button';
-import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play, ArrowLeft, Package, Clock, ShieldCheck, ShieldAlert, Heart, Lock, AlertTriangle, Layers } from 'lucide-react';
+import { X, MapPin, MessageCircle, Send, Users, CheckCircle, Navigation, Truck, Handshake, Globe, Loader2, StopCircle, Mic, Volume2, Trash2, ExternalLink, Play, ArrowLeft, Package, Clock, ShieldCheck, ShieldAlert, Heart, Lock, AlertTriangle, Layers, ShoppingCart } from 'lucide-react';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
 import { playPcmAudio } from '../utils/audio';
@@ -268,7 +268,7 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
             <div className="p-6">
                 
                 {/* Meta Info Bar */}
-                <div className="flex gap-4 mb-6 overflow-x-auto pb-2 scrollbar-none">
+                <div className="flex gap-4 mb-6 overflow-x-auto pb-2 scrollbar-none items-center">
                      <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm shrink-0">
                         {request.deliveryPreference === DeliveryPreference.SHIPPING ? <Truck className="w-4 h-4 text-blue-500" /> : <Handshake className="w-4 h-4 text-green-500" />}
                         <div className="flex flex-col">
@@ -291,6 +291,17 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                                 <span className="text-xs font-bold text-slate-700">{distanceInfo}</span>
                             </div>
                         </div>
+                     )}
+                     
+                     {request.productUrl && (
+                        <a 
+                            href={request.productUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="ml-auto flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-indigo-700 transition-colors"
+                        >
+                            <ShoppingCart className="w-3 h-3" /> Visit Store
+                        </a>
                      )}
                 </div>
 

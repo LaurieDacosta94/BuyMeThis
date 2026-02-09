@@ -48,10 +48,13 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
               if (metadata.image) setUploadedImage(metadata.image);
               if (metadata.description) setLinkDescription(metadata.description);
               
-              // Auto-fill title if empty
-              if (!formData.title && metadata.title) {
-                  setFormData(prev => ({ ...prev, title: metadata.title }));
-              }
+              setFormData(prev => ({
+                  ...prev,
+                  // Auto-fill title if empty
+                  title: !prev.title && metadata.title ? metadata.title : prev.title,
+                  // Auto-fill reason if empty
+                  reason: !prev.reason && metadata.description ? metadata.description : prev.reason
+              }));
           }
       } catch (e) {
           console.error("Failed to fetch link data", e);
@@ -133,7 +136,7 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
       let enriched = { 
           title: formData.title, 
           price: 0, 
-          description: linkDescription || "User requested", 
+          description: linkDescription || formData.reason, 
           category: formData.category, 
           imageUrl: uploadedImage || undefined 
       };
@@ -197,7 +200,7 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
       enrichedData: { 
           title: formData.title, 
           price: 0, 
-          description: linkDescription || "User requested", 
+          description: linkDescription || formData.reason, 
           imageUrl: finalImage 
       },
       comments: [],
