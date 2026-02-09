@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { RequestItem, RequestStatus, User, Category, DeliveryPreference } from '../types';
 import { validateContent, generateRequestSpeech, transcribeAudio } from '../services/geminiService';
-import { MapPin, Volume2, Loader2, StopCircle, Mic, Users, Trash2, MessageCircle, Send, Heart, Play, Pause, ExternalLink, CornerDownRight, Truck, Handshake, Info, Link as LinkIcon } from 'lucide-react';
+import { MapPin, Volume2, Loader2, StopCircle, Mic, Users, Trash2, MessageCircle, Send, Heart, Play, Pause, ExternalLink, CornerDownRight, Truck, Handshake, Info, Link as LinkIcon, ShoppingCart } from 'lucide-react';
 import { Button } from './Button';
 import { calculateDistance, formatDistance } from '../utils/geo';
 import { playPcmAudio } from '../utils/audio';
@@ -230,6 +230,19 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             </div>
         </div>
 
+        {/* External Link Button on Image */}
+        {request.productUrl && (
+             <a 
+                href={request.productUrl} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                onClick={(e) => e.stopPropagation()}
+                className="absolute bottom-3 right-3 bg-white hover:bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1 transition-transform hover:scale-105"
+             >
+                 <ShoppingCart className="w-3 h-3" /> Visit Store
+             </a>
+        )}
+
         {isReceived ? (
              <div className="absolute inset-0 flex items-center justify-center bg-green-500/80 backdrop-blur-[2px]">
                  <div className="bg-white text-green-600 px-4 py-1.5 rounded-full font-bold shadow-lg transform -rotate-3 text-sm">
@@ -276,26 +289,6 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         <p className="text-xs text-slate-500 leading-relaxed line-clamp-3 mb-4 flex-1">
             {request.reason}
         </p>
-
-        {request.productUrl && (
-             <div className="mb-4">
-                 {/* Webpage Thumbnail / Link Preview */}
-                 <a href={request.productUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="group/link flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100 hover:bg-indigo-50 hover:border-indigo-200 transition-colors no-underline">
-                     <div className="w-10 h-10 bg-slate-200 rounded-lg shrink-0 overflow-hidden">
-                        {linkPreviewImage ? (
-                            <img src={linkPreviewImage} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-400"><ExternalLink className="w-4 h-4" /></div>
-                        )}
-                     </div>
-                     <div className="flex-1 min-w-0">
-                         <div className="text-[10px] font-bold text-slate-600 truncate group-hover/link:text-indigo-600">Product Link</div>
-                         <div className="text-[9px] text-slate-400 truncate">{new URL(request.productUrl).hostname}</div>
-                     </div>
-                     <ExternalLink className="w-3 h-3 text-slate-300 group-hover/link:text-indigo-400 mr-1" />
-                 </a>
-             </div>
-        )}
 
         <div className="flex items-center justify-between mb-4 border-t border-slate-100 pt-3">
              <div className="flex gap-2">

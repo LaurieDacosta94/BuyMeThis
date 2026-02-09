@@ -50,10 +50,12 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
               
               setFormData(prev => ({
                   ...prev,
-                  // Auto-fill title if empty
-                  title: !prev.title && metadata.title ? metadata.title : prev.title,
-                  // Auto-fill reason if empty
-                  reason: !prev.reason && metadata.description ? metadata.description : prev.reason
+                  // Auto-fill title if empty or simply update it
+                  title: !prev.title ? (metadata.title || prev.title) : prev.title,
+                  // Use description for reason if reason is empty.
+                  // If reason is not empty, we assume user typed something custom.
+                  // However, let's append it if it's very short (likely empty or placeholder)
+                  reason: !prev.reason || prev.reason.length < 10 ? (metadata.description || prev.reason) : prev.reason
               }));
           }
       } catch (e) {

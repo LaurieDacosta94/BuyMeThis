@@ -239,7 +239,7 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
         ) : (
         <>
         {/* Hero Header */}
-        <div className="relative h-56 shrink-0 group">
+        <div className="relative h-64 shrink-0 group">
              <div className="absolute inset-0 bg-slate-900/30 z-10 transition-colors group-hover:bg-slate-900/10"></div>
              
              {request.enrichedData?.imageUrl ? (
@@ -256,11 +256,23 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
             
             <button onClick={onClose} className="absolute top-4 right-4 z-20 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-md transition-colors"><X className="w-5 h-5"/></button>
 
-            <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-900/90 to-transparent pt-20">
+             {/* Visit Store Button in Header */}
+            {request.productUrl && (
+                <a 
+                    href={request.productUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="absolute bottom-4 right-4 z-20 flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg hover:bg-indigo-700 transition-transform hover:scale-105"
+                >
+                    <ShoppingCart className="w-4 h-4" /> Visit Store
+                </a>
+            )}
+
+            <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-900/90 to-transparent pt-20 pointer-events-none">
                 <div className="flex flex-wrap gap-2 mb-2">
                     <span className="bg-cyan-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-sm uppercase">{request.category}</span>
                 </div>
-                <h1 className="text-3xl font-black text-white leading-tight">{request.title}</h1>
+                <h1 className="text-3xl font-black text-white leading-tight max-w-lg">{request.title}</h1>
             </div>
         </div>
 
@@ -291,17 +303,6 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                                 <span className="text-xs font-bold text-slate-700">{distanceInfo}</span>
                             </div>
                         </div>
-                     )}
-                     
-                     {request.productUrl && (
-                        <a 
-                            href={request.productUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="ml-auto flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-indigo-700 transition-colors"
-                        >
-                            <ShoppingCart className="w-3 h-3" /> Visit Store
-                        </a>
                      )}
                 </div>
 
