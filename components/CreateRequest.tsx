@@ -2,8 +2,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './Button';
 import { enrichRequestData, validateContent, analyzeImageForRequest, analyzeAudioForRequest, generateRequestImage, getApproximateAddress } from '../services/geminiService';
+import { fetchLinkMetadata } from '../services/linkService';
 import { RequestItem, RequestStatus, User, Coordinates, Category, DeliveryPreference } from '../types';
-import { Sparkles, Link as LinkIcon, Camera, Mic, Wand2, Crosshair, ArrowRight, ArrowLeft, Image as ImageIcon, MapPin, Loader2 } from 'lucide-react';
+import { Sparkles, Link as LinkIcon, Camera, Mic, Wand2, Crosshair, ArrowRight, ArrowLeft, Image as ImageIcon, MapPin, Loader2, DownloadCloud } from 'lucide-react';
 
 interface CreateRequestProps {
   currentUser: User;
@@ -31,21 +32,31 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
   const [locationName, setLocationName] = useState(currentUser.location);
   const [isLocating, setIsLocating] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [linkDescription, setLinkDescription] = useState<string>(''); // Store fetched description
+  
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Fetch link metadata to get image if URL is provided
-  const fetchLinkImage = async (url: string) => {
-      if (!url) return;
+  // Fetch link metadata (Title, Description, Image)
+  const handleLinkFetch = async () => {
+      if (!formData.productUrl) return;
+      setIsLoading(true);
       try {
-          const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`);
-          const json = await res.json();
-          if (json.status === 'success' && json.data.image?.url) {
-              setUploadedImage(json.data.image.url);
+          const metadata = await fetchLinkMetadata(formData.productUrl);
+          if (metadata) {
+              if (metadata.image) setUploadedImage(metadata.image);
+              if (metadata.description) setLinkDescription(metadata.description);
+              
+              // Auto-fill title if empty
+              if (!formData.title && metadata.title) {
+                  setFormData(prev => ({ ...prev, title: metadata.title }));
+              }
           }
       } catch (e) {
-          console.error("Failed to fetch link image", e);
+          console.error("Failed to fetch link data", e);
+      } finally {
+          setIsLoading(false);
       }
   };
 
@@ -113,21 +124,39 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
     setIsLoading(true);
     setError(null);
     try {
+      // Safety check is still important
       const safetyCheck = await validateContent(formData.title + " " + formData.reason);
       if (!safetyCheck.safe) throw new Error("Safety check failed: Content flagged.");
 
-      let enriched = { title: formData.title, price: 0, description: "", category: formData.category };
+      // If we already have link data, we can construct the enriched data without another AI call
+      // or we can use AI to categorize if needed.
+      let enriched = { 
+          title: formData.title, 
+          price: 0, 
+          description: linkDescription || "User requested", 
+          category: formData.category, 
+          imageUrl: uploadedImage || undefined 
+      };
       
-      if (formData.productUrl) {
-          // If URL present, ensure we have an image from it if possible
-          if (!uploadedImage) {
-              await fetchLinkImage(formData.productUrl);
-          }
+      // If no link data but we have a URL, or if we want to force AI verification
+      if (formData.productUrl && !linkDescription) {
           const result = await enrichRequestData(formData.productUrl, formData.title, formData.reason);
-          enriched = { ...result, category: Object.values(Category).includes(result.category as Category) ? (result.category as Category) : Category.OTHER };
+          enriched = { 
+              ...result, 
+              category: Object.values(Category).includes(result.category as Category) ? (result.category as Category) : Category.OTHER,
+              imageUrl: result.imageUrl || uploadedImage || undefined
+          };
       }
 
       setFormData(prev => ({ ...prev, title: prev.title || enriched.title }));
+      // We don't overwrite category if user selected one, unless it was 'Other'
+      if (formData.category === Category.OTHER && enriched.category !== 'General') {
+          // Check if valid category
+           if (Object.values(Category).includes(enriched.category as Category)) {
+               setFormData(prev => ({ ...prev, category: enriched.category as Category }));
+           }
+      }
+
       setStep(2);
     } catch (err: any) { setError(err.message); } finally { setIsLoading(false); }
   };
@@ -165,7 +194,12 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
       createdAt: new Date().toISOString(),
       location: locationName, 
       coordinates: coordinates,
-      enrichedData: { title: formData.title, price: 0, description: "User requested", imageUrl: finalImage },
+      enrichedData: { 
+          title: formData.title, 
+          price: 0, 
+          description: linkDescription || "User requested", 
+          imageUrl: finalImage 
+      },
       comments: [],
       candidates: []
     };
@@ -232,18 +266,16 @@ export const CreateRequest: React.FC<CreateRequestProps> = ({ currentUser, onSub
                       <LinkIcon className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
                       <input 
                         type="url" 
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
+                        className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none text-sm bg-slate-50 focus:bg-white transition-all" 
                         placeholder="https://amazon.com/..." 
                         value={formData.productUrl} 
-                        onChange={(e) => {
-                            setFormData({...formData, productUrl: e.target.value});
-                            // If user pastes URL and we don't have an image yet, fetch it
-                            if (e.target.value.length > 8 && !uploadedImage) {
-                                fetchLinkImage(e.target.value);
-                            }
-                        }} 
+                        onChange={(e) => setFormData({...formData, productUrl: e.target.value})}
+                        onBlur={handleLinkFetch}
                       />
+                      {isLoading && <div className="absolute right-3 top-3.5"><Loader2 className="h-4 w-4 text-cyan-500 animate-spin"/></div>}
+                      {!isLoading && formData.productUrl && <div className="absolute right-3 top-3.5"><DownloadCloud className="h-4 w-4 text-slate-400 cursor-pointer hover:text-cyan-500" onClick={handleLinkFetch} title="Fetch Info" /></div>}
                   </div>
+                  {linkDescription && <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1"><Sparkles className="h-3 w-3"/> Link data fetched successfully</p>}
                 </div>
 
                 <div>
